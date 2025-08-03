@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slide – Choose Your Role</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+  </head>
+  <body class="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-800">
+    <!-- === NAVBAR === -->
+    <header class="bg-white/70 backdrop-blur-md fixed top-0 inset-x-0 z-50 shadow-sm">
+      <div class="max-w-3xl mx-auto flex items-center justify-between p-4">
+        <a href="index.html" class="text-2xl font-extrabold text-indigo-600">Slide</a>
+        <a href="index.html" class="rounded-xl bg-gray-100 px-4 py-1.5 text-sm font-medium hover:bg-gray-200 transition">← Home</a>
+      </div>
+    </header>
+    <div class="h-16"></div>
+
+    <!-- === ROLE SELECTION === -->
+    <main class="flex-1">
+      <div class="max-w-4xl mx-auto px-6 py-20">
+        <h2 class="text-3xl font-extrabold text-center mb-12">Choose Your Role</h2>
+        <div class="grid md:grid-cols-2 gap-8">
+          <div class="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i data-feather="truck" class="w-10 h-10 text-indigo-600"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-4">I'm a Driver</h3>
+            <p class="text-gray-600 mb-6">Deliver packages along your commute and earn money on the miles you already drive.</p>
+            <button onclick="selectRole('slider')" class="w-full bg-indigo-600 text-white font-semibold rounded-lg py-3 hover:bg-indigo-700 transition">Become a Slider</button>
+          </div>
+          <div class="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i data-feather="package" class="w-10 h-10 text-indigo-600"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-4">I'm a Shipper</h3>
+            <p class="text-gray-600 mb-6">Send packages with local drivers for faster, greener, and cheaper delivery.</p>
+            <button onclick="selectRole('shipper')" class="w-full bg-indigo-600 text-white font-semibold rounded-lg py-3 hover:bg-indigo-700 transition">Become a Shipper</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- === FOOTER === -->
+    <footer class="bg-gray-900 text-gray-400 text-xs py-4 text-center">
+      © 2025 Slide Logistics, Inc.
+    </footer>
+
+    <!-- === SCRIPTS === -->
+    <script>
+      feather.replace();
+
+      const LS_KEY = 'slideUser';
+
+      function selectRole(role) {
+        const user = JSON.parse(localStorage.getItem(LS_KEY) || null);
+        if (user) {
+          user.role = role;
+          localStorage.setItem(LS_KEY, JSON.stringify(user));
+          window.location.href = role === 'slider' ? 'slider-dashboard.html' : 'shipper-dashboard.html';
+        } else {
+          window.location.href = 'auth.html';
+        }
+      }
+
+      // Redirect if not logged in
+      document.addEventListener('DOMContentLoaded', () => {
+        const user = JSON.parse(localStorage.getItem(LS_KEY) || null);
+        if (!user) {
+          window.location.href = 'auth.html';
+        }
+      });
+    </script>
+  </body>
+</html> 
