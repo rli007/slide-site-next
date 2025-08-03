@@ -32,14 +32,20 @@ export default function Home() {
                 Last‑mile Delivery<br />That&nbsp;Rides&nbsp;Your&nbsp;Commute
               </h1>
               <p className="text-lg md:text-xl mb-8 max-w-md">
-                Slide pairs local packages with everyday drivers already headed the right direction—cutting costs for merchants and putting money back in drivers' pockets.
+                Slide pairs local packages with everyday drivers already headed the right direction—cutting costs for merchants and putting money back in drivers&apos; pockets.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link href="/auth" className="rounded-xl bg-white text-indigo-700 font-semibold px-6 py-3 shadow-xl hover:bg-gray-100 transition">Get&nbsp;Started</Link>
                 <Link href="/slider-info" className="rounded-xl bg-white/20 ring-1 ring-white/40 text-white font-semibold px-6 py-3 hover:bg-white/30 transition">Learn&nbsp;More</Link>
               </div>
             </div>
-            <img src="https://images.unsplash.com/photo-1523475496153-3a12e4f7b2c8?auto=format&fit=crop&w=900&q=60" alt="Map mockup" className="rounded-3xl shadow-2xl border border-white/20" />
+            <Image 
+              src="https://images.unsplash.com/photo-1523475496153-3a12e4f7b2c8?auto=format&fit=crop&w=900&q=60" 
+              alt="Map mockup" 
+              width={900}
+              height={600}
+              className="rounded-3xl shadow-2xl border border-white/20"
+            />
           </div>
           <svg className="absolute bottom-0 w-full text-white" viewBox="0 0 1440 100">
             <path fill="currentColor" d="M0,0C80,60,320,120,720,60S1360,-10,1440,30L1440,100H0Z"/>
@@ -90,7 +96,7 @@ export default function Home() {
             <div className="space-y-6">
               <details className="bg-gray-50 rounded-2xl shadow p-6">
                 <summary className="cursor-pointer font-semibold">Is Slide available in my city?</summary>
-                <p className="mt-4 text-sm text-gray-600">We're piloting in the San Francisco Bay Area. Add your email and we'll notify you when we expand.</p>
+                <p className="mt-4 text-sm text-gray-600">We&apos;re piloting in the San Francisco Bay Area. Add your email and we&apos;ll notify you when we expand.</p>
               </details>
               <details className="bg-gray-50 rounded-2xl shadow p-6">
                 <summary className="cursor-pointer font-semibold">How much can drivers earn?</summary>
@@ -98,7 +104,7 @@ export default function Home() {
               </details>
               <details className="bg-gray-50 rounded-2xl shadow p-6">
                 <summary className="cursor-pointer font-semibold">What package sizes are allowed?</summary>
-                <p className="mt-4 text-sm text-gray-600">Anything up to 20 lbs and 18" on the longest side (shoebox sized or smaller).</p>
+                <p className="mt-4 text-sm text-gray-600">Anything up to 20 lbs and 18&quot; on the longest side (shoebox sized or smaller).</p>
               </details>
             </div>
           </div>
