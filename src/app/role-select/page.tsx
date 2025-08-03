@@ -52,7 +52,7 @@ export default function RoleSelect() {
               <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <i data-feather="truck" className="w-10 h-10 text-indigo-600"></i>
               </div>
-              <h3 className="text-xl font-semibold mb-4">I'm a Driver</h3>
+              <h3 className="text-xl font-semibold mb-4">I&apos;m a Driver</h3>
               <p className="text-gray-600 mb-6">Deliver packages along your commute and earn money on the miles you already drive.</p>
               <button 
                 onClick={() => selectRole('slider')} 
@@ -65,7 +65,7 @@ export default function RoleSelect() {
               <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <i data-feather="package" className="w-10 h-10 text-indigo-600"></i>
               </div>
-              <h3 className="text-xl font-semibold mb-4">I'm a Shipper</h3>
+              <h3 className="text-xl font-semibold mb-4">I&apos;m a Shipper</h3>
               <p className="text-gray-600 mb-6">Send packages with local drivers for faster, greener, and cheaper delivery.</p>
               <button 
                 onClick={() => selectRole('shipper')} 

@@ -10,8 +10,8 @@ export default function ShipperInfo() {
           <nav className="hidden md:flex space-x-8 text-sm font-medium">
             <Link href="/slider-info" className="hover:text-indigo-600">For&nbsp;Sliders</Link>
             <Link href="/shipper-info" className="hover:text-indigo-600">For&nbsp;Shippers</Link>
-            <a href="/#features" className="hover:text-indigo-600">Features</a>
-            <a href="/#faq" className="hover:text-indigo-600">FAQ</a>
+            <Link href="/#features" className="hover:text-indigo-600">Features</Link>
+            <Link href="/#faq" className="hover:text-indigo-600">FAQ</Link>
           </nav>
           <Link href="/auth" className="rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold shadow hover:bg-indigo-700 transition">Log&nbsp;in</Link>
         </div>
@@ -52,7 +52,7 @@ export default function ShipperInfo() {
                   <span className="text-2xl font-bold text-indigo-600">1</span>
                 </div>
                 <h3 className="text-xl font-semibold mb-4">Create Shipment</h3>
-                <p className="text-gray-600">Enter package details and destination. We'll find drivers heading that way.</p>
+                <p className="text-gray-600">Enter package details and destination. We&apos;ll find drivers heading that way.</p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -120,7 +120,7 @@ export default function ShipperInfo() {
               <ul className="text-left space-y-2 text-sm text-gray-600">
                 <li className="flex items-center">
                   <i data-feather="check" className="w-4 h-4 text-green-500 mr-2"></i>
-                  Package size up to 20 lbs, 18" longest side
+                  Package size up to 20 lbs, 18&quot; longest side
                 </li>
                 <li className="flex items-center">
                   <i data-feather="check" className="w-4 h-4 text-green-500 mr-2"></i>

@@ -10,8 +10,8 @@ export default function SliderInfo() {
           <nav className="hidden md:flex space-x-8 text-sm font-medium">
             <Link href="/slider-info" className="hover:text-indigo-600">For&nbsp;Sliders</Link>
             <Link href="/shipper-info" className="hover:text-indigo-600">For&nbsp;Shippers</Link>
-            <a href="/#features" className="hover:text-indigo-600">Features</a>
-            <a href="/#faq" className="hover:text-indigo-600">FAQ</a>
+            <Link href="/#features" className="hover:text-indigo-600">Features</Link>
+            <Link href="/#faq" className="hover:text-indigo-600">FAQ</Link>
           </nav>
           <Link href="/auth" className="rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold shadow hover:bg-indigo-700 transition">Log&nbsp;in</Link>
         </div>
@@ -52,7 +52,7 @@ export default function SliderInfo() {
                   <span className="text-2xl font-bold text-indigo-600">1</span>
                 </div>
                 <h3 className="text-xl font-semibold mb-4">Set Your Route</h3>
-                <p className="text-gray-600">Tell us where you're going and when. We'll find packages heading the same direction.</p>
+                <p className="text-gray-600">Tell us where you&apos;re going and when. We&apos;ll find packages heading the same direction.</p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">

@@ -71,7 +71,7 @@ export default function SliderDashboard() {
             <p className="text-gray-600 mb-6">Your dashboard is coming soon. Check back for delivery opportunities and earnings tracking.</p>
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-indigo-50 rounded-lg p-6">
-                <h4 className="font-semibold mb-2">Today's Earnings</h4>
+                <h4 className="font-semibold mb-2">Today&apos;s Earnings</h4>
                 <p className="text-2xl font-bold text-indigo-600">$0</p>
               </div>
               <div className="bg-indigo-50 rounded-lg p-6">
