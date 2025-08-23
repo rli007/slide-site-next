@@ -8,25 +8,25 @@ type Delivery = Database['public']['Tables']['deliveries']['Row']
 // User functions
 export const createUser = async (email: string) => {
   try {
-    // Get the current authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get the current session instead of user
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    if (authError) {
-      console.error('Auth error in createUser:', authError);
-      throw authError;
+    if (sessionError) {
+      console.error('Session error in createUser:', sessionError);
+      throw sessionError;
     }
     
-    if (!user) {
-      console.error('No authenticated user found in createUser');
-      throw new Error('No authenticated user found');
+    if (!session?.user) {
+      console.error('No session or user found in createUser');
+      throw new Error('No authenticated session found');
     }
 
-    console.log('Creating user profile for:', user.id, email);
+    console.log('Creating user profile for:', session.user.id, email);
 
     const { data, error } = await supabase
       .from('users')
       .insert([{ 
-        id: user.id, // Use the auth user's ID
+        id: session.user.id, // Use the session user's ID
         email: email 
       }])
       .select()

@@ -98,9 +98,23 @@ export default function Auth() {
         if (authData.user) {
           // Create user profile in our database
           try {
-            // Wait a moment for the user to be fully authenticated
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait for the session to be established
+            let session = null;
+            let attempts = 0;
             
+            while (!session && attempts < 10) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              const { data: { session: currentSession } } = await supabase.auth.getSession();
+              session = currentSession;
+              attempts++;
+              console.log(`Session check attempt ${attempts}:`, session ? 'Found' : 'Not found');
+            }
+            
+            if (!session) {
+              throw new Error('Session not established after signup');
+            }
+            
+            console.log('Session established, creating user profile...');
             await createUser(authData.user.email!);
             // Redirect to role selection
             window.location.href = '/role-select';
