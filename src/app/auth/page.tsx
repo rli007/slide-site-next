@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
-import { createUser, getUserByEmail } from "../../lib/database";
+import { createUser, getUserByEmail, testDatabaseAccess } from "../../lib/database";
 
 export default function Auth() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -98,6 +98,9 @@ export default function Auth() {
         if (authData.user) {
           // Create user profile in our database
           try {
+            // Wait a moment for the user to be fully authenticated
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
             await createUser(authData.user.email!);
             // Redirect to role selection
             window.location.href = '/role-select';
@@ -248,6 +251,21 @@ export default function Auth() {
                 {authMode === 'login' ? 'Sign up' : 'Log in'}
               </button>
             </p>
+            
+            {/* Debug button - remove this in production */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={async () => {
+                  console.log('Testing database access...');
+                  const result = await testDatabaseAccess();
+                  console.log('Test result:', result);
+                }}
+                className="w-full text-xs text-gray-500 hover:text-gray-700 py-2"
+              >
+                🐛 Debug: Test Database Access
+              </button>
+            </div>
           </form>
         </div>
       </main>

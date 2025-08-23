@@ -7,24 +7,42 @@ type Delivery = Database['public']['Tables']['deliveries']['Row']
 
 // User functions
 export const createUser = async (email: string) => {
-  // Get the current authenticated user
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    throw new Error('No authenticated user found');
-  }
+  try {
+    // Get the current authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error('Auth error in createUser:', authError);
+      throw authError;
+    }
+    
+    if (!user) {
+      console.error('No authenticated user found in createUser');
+      throw new Error('No authenticated user found');
+    }
 
-  const { data, error } = await supabase
-    .from('users')
-    .insert([{ 
-      id: user.id, // Use the auth user's ID
-      email: email 
-    }])
-    .select()
-    .single()
-  
-  if (error) throw error
-  return data
+    console.log('Creating user profile for:', user.id, email);
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert([{ 
+        id: user.id, // Use the auth user's ID
+        email: email 
+      }])
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Database insert error:', error);
+      throw error;
+    }
+
+    console.log('User profile created successfully:', data);
+    return data;
+  } catch (err) {
+    console.error('createUser function error:', err);
+    throw err;
+  }
 }
 
 export const getUser = async (id: string) => {
@@ -171,4 +189,46 @@ export const getPendingDeliveries = async () => {
   
   if (error) throw error
   return data
+}
+
+// Test function to debug database access
+export const testDatabaseAccess = async () => {
+  try {
+    console.log('Testing database access...');
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log('Current auth user:', user);
+    console.log('Auth error:', authError);
+    
+    if (!user) {
+      console.log('No authenticated user');
+      return;
+    }
+    
+    // Try to read from users table
+    const { data: readData, error: readError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id);
+    
+    console.log('Read test result:', { data: readData, error: readError });
+    
+    // Try to insert a test record
+    const { data: insertData, error: insertError } = await supabase
+      .from('users')
+      .insert([{ 
+        id: user.id,
+        email: user.email!,
+        role: null
+      }])
+      .select();
+    
+    console.log('Insert test result:', { data: insertData, error: insertError });
+    
+    return { readData, readError, insertData, insertError };
+  } catch (err) {
+    console.error('Test function error:', err);
+    return { error: err };
+  }
 }
