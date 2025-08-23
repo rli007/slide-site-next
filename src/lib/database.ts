@@ -7,9 +7,19 @@ type Delivery = Database['public']['Tables']['deliveries']['Row']
 
 // User functions
 export const createUser = async (email: string) => {
+  // Get the current authenticated user
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('No authenticated user found');
+  }
+
   const { data, error } = await supabase
     .from('users')
-    .insert([{ email }])
+    .insert([{ 
+      id: user.id, // Use the auth user's ID
+      email: email 
+    }])
     .select()
     .single()
   

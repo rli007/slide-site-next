@@ -102,6 +102,9 @@ export default function Auth() {
             // Redirect to role selection
             window.location.href = '/role-select';
           } catch (dbError) {
+            console.error('Database error:', dbError);
+            // If profile creation fails, we still have the auth user
+            // Let them try to log in
             setError('Account created but profile setup failed. Please try logging in.');
             setIsLoading(false);
           }
@@ -129,12 +132,19 @@ export default function Auth() {
               window.location.href = '/role-select';
             }
           } catch (dbError) {
-            setError('User profile not found. Please contact support.');
-            setIsLoading(false);
+            // User might not have a profile yet, create one
+            try {
+              await createUser(authData.user.email!);
+              window.location.href = '/role-select';
+            } catch (createError) {
+              setError('User profile not found. Please contact support.');
+              setIsLoading(false);
+            }
           }
         }
       }
     } catch (err) {
+      console.error('Auth error:', err);
       setError('Something went wrong. Please try again.');
       setIsLoading(false);
     }

@@ -47,39 +47,39 @@ ALTER TABLE public.deliveries ENABLE ROW LEVEL SECURITY;
 -- Create RLS policies
 -- Users can only see and modify their own data
 CREATE POLICY "Users can view own profile" ON public.users
-    FOR SELECT USING (auth.uid()::text = id::text);
+    FOR SELECT USING (auth.uid() = id);
 
 CREATE POLICY "Users can update own profile" ON public.users
-    FOR UPDATE USING (auth.uid()::text = id::text);
+    FOR UPDATE USING (auth.uid() = id);
 
 CREATE POLICY "Users can insert own profile" ON public.users
-    FOR INSERT WITH CHECK (auth.uid()::text = id::text);
+    FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Routes policies
 CREATE POLICY "Users can view own routes" ON public.routes
-    FOR SELECT USING (auth.uid()::text = user_id::text);
+    FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert own routes" ON public.routes
-    FOR INSERT WITH CHECK (auth.uid()::text = user_id::text);
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update own routes" ON public.routes
-    FOR UPDATE USING (auth.uid()::text = user_id::text);
+    FOR UPDATE USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own routes" ON public.routes
-    FOR DELETE USING (auth.uid()::text = user_id::text);
+    FOR DELETE USING (auth.uid() = user_id);
 
 -- Deliveries policies
 CREATE POLICY "Users can view own deliveries" ON public.deliveries
-    FOR SELECT USING (auth.uid()::text = shipper_id::text);
+    FOR SELECT USING (auth.uid() = shipper_id);
 
 CREATE POLICY "Users can insert own deliveries" ON public.deliveries
-    FOR INSERT WITH CHECK (auth.uid()::text = shipper_id::text);
+    FOR INSERT WITH CHECK (auth.uid() = shipper_id);
 
 CREATE POLICY "Users can update own deliveries" ON public.deliveries
-    FOR UPDATE USING (auth.uid()::text = shipper_id::text);
+    FOR UPDATE USING (auth.uid() = shipper_id);
 
 CREATE POLICY "Users can delete own deliveries" ON public.deliveries
-    FOR DELETE USING (auth.uid()::text = shipper_id::text);
+    FOR DELETE USING (auth.uid() = shipper_id);
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
