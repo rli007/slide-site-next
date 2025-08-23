@@ -2,19 +2,22 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
+import { getUserByEmail, getUserDeliveries, createDelivery, updateDelivery, deleteDelivery } from "../../lib/database";
 
 interface Delivery {
   id: string;
-  pickupLocation: string;
-  dropoffLocation: string;
-  packageSize: string;
+  pickup_location: string;
+  dropoff_location: string;
+  package_size: string;
   status: 'pending' | 'assigned' | 'in-transit' | 'delivered';
-  createdAt: string;
+  created_at: string;
 }
 
 export default function ShipperDashboard() {
   const [userEmail, setUserEmail] = useState('');
   const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [showAddDelivery, setShowAddDelivery] = useState(false);
   const [newDelivery, setNewDelivery] = useState({
@@ -22,84 +25,127 @@ export default function ShipperDashboard() {
     dropoffLocation: '',
     packageSize: ''
   });
-  const LS_KEY = 'slideUser';
 
   useEffect(() => {
     setIsClient(true);
-    // Check authentication and load user data
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (!user) {
-      window.location.href = '/auth';
-      return;
-    }
-    
-    if (user.role !== 'shipper') {
-      window.location.href = user.role === 'slider' ? '/slider-dashboard' : '/role-select';
-      return;
-    }
-
-    // Display user email and load deliveries
-    setUserEmail(user.email);
-    setDeliveries(user.packages || []);
+    checkAuthAndLoadData();
   }, []);
 
-  const logout = () => {
-    localStorage.removeItem(LS_KEY);
+  const checkAuthAndLoadData = async () => {
+    try {
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.log('No authenticated user, redirecting to auth');
+        window.location.href = '/auth';
+        return;
+      }
+
+      // Check if user has a role set
+      try {
+        const userProfile = await getUserByEmail(user.email!);
+        
+        if (!userProfile.role) {
+          console.log('No role set, redirecting to role selection');
+          window.location.href = '/role-select';
+          return;
+        }
+        
+        if (userProfile.role !== 'shipper') {
+          console.log('User is not a shipper, redirecting to appropriate dashboard');
+          window.location.href = userProfile.role === 'slider' ? '/slider-dashboard' : '/role-select';
+          return;
+        }
+
+        // User is authenticated and has shipper role, load data
+        setUserEmail(user.email!);
+        await loadDeliveries(user.id);
+        setIsLoading(false);
+        
+      } catch (dbError) {
+        console.error('Database error:', dbError);
+        // If user profile doesn't exist, redirect to role selection
+        window.location.href = '/role-select';
+        return;
+      }
+      
+    } catch (error) {
+      console.error('Auth check error:', error);
+      window.location.href = '/auth';
+    }
+  };
+
+  const loadDeliveries = async (userId: string) => {
+    try {
+      const userDeliveries = await getUserDeliveries(userId);
+      setDeliveries(userDeliveries || []);
+    } catch (error) {
+      console.error('Error loading deliveries:', error);
+      setDeliveries([]);
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     window.location.href = '/';
   };
 
-  const addDelivery = () => {
+  const addDelivery = async () => {
     if (!newDelivery.pickupLocation.trim() || !newDelivery.dropoffLocation.trim() || !newDelivery.packageSize.trim()) {
       return;
     }
 
-    const delivery: Delivery = {
-      id: Date.now().toString(),
-      pickupLocation: newDelivery.pickupLocation,
-      dropoffLocation: newDelivery.dropoffLocation,
-      packageSize: newDelivery.packageSize,
-      status: 'pending',
-      createdAt: new Date().toLocaleDateString()
-    };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const updatedDeliveries = [...deliveries, delivery];
-    setDeliveries(updatedDeliveries);
-    
-    // Update localStorage
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (user) {
-      user.packages = updatedDeliveries;
-      localStorage.setItem(LS_KEY, JSON.stringify(user));
-    }
+      const deliveryData = {
+        shipper_id: user.id,
+        pickup_location: newDelivery.pickupLocation,
+        dropoff_location: newDelivery.dropoffLocation,
+        package_size: newDelivery.packageSize,
+        status: 'pending' as const
+      };
 
-    // Reset form
-    setNewDelivery({ pickupLocation: '', dropoffLocation: '', packageSize: '' });
-    setShowAddDelivery(false);
-  };
-
-  const updateDeliveryStatus = (deliveryId: string, newStatus: Delivery['status']) => {
-    const updatedDeliveries = deliveries.map(delivery => 
-      delivery.id === deliveryId ? { ...delivery, status: newStatus } : delivery
-    );
-    setDeliveries(updatedDeliveries);
-    
-    // Update localStorage
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (user) {
-      user.packages = updatedDeliveries;
-      localStorage.setItem(LS_KEY, JSON.stringify(user));
+      await createDelivery(deliveryData);
+      
+      // Reload deliveries
+      await loadDeliveries(user.id);
+      
+      // Reset form
+      setNewDelivery({ pickupLocation: '', dropoffLocation: '', packageSize: '' });
+      setShowAddDelivery(false);
+    } catch (error) {
+      console.error('Error adding delivery:', error);
     }
   };
 
-  const deleteDelivery = (deliveryId: string) => {
-    const updatedDeliveries = deliveries.filter(delivery => delivery.id !== deliveryId);
-    setDeliveries(updatedDeliveries);
-    
-    // Update localStorage
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (user) {
-      user.packages = updatedDeliveries;
-      localStorage.setItem(LS_KEY, JSON.stringify(user));
+  const updateDeliveryStatus = async (deliveryId: string, newStatus: Delivery['status']) => {
+    try {
+      await updateDelivery(deliveryId, { status: newStatus });
+      
+      // Reload deliveries
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await loadDeliveries(user.id);
+      }
+    } catch (error) {
+      console.error('Error updating delivery:', error);
+    }
+  };
+
+  const deleteDelivery = async (deliveryId: string) => {
+    try {
+      await deleteDelivery(deliveryId);
+      
+      // Reload deliveries
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await loadDeliveries(user.id);
+      }
+    } catch (error) {
+      console.error('Error deleting delivery:', error);
     }
   };
 
@@ -123,9 +169,16 @@ export default function ShipperDashboard() {
     }
   };
 
-  // Don't render until client-side
-  if (!isClient) {
-    return null;
+  // Don't render until client-side and data is loaded
+  if (!isClient || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   const pendingDeliveries = deliveries.filter(d => d.status === 'pending');
@@ -250,8 +303,8 @@ export default function ShipperDashboard() {
                   <div key={delivery.id} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex-1">
-                        <div className="font-medium">{delivery.pickupLocation} → {delivery.dropoffLocation}</div>
-                        <div className="text-sm text-gray-600">Package: {delivery.packageSize} • Created: {delivery.createdAt}</div>
+                        <div className="font-medium">{delivery.pickup_location} → {delivery.dropoff_location}</div>
+                        <div className="text-sm text-gray-600">Package: {delivery.package_size} • Created: {new Date(delivery.created_at).toLocaleDateString()}</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(delivery.status)}`}>
@@ -277,7 +330,7 @@ export default function ShipperDashboard() {
                           {delivery.status === 'in-transit' && (
                             <button 
                               onClick={() => updateDeliveryStatus(delivery.id, 'delivered')}
-                              className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition"
+                              className="bg-green-500 text-white font-semibold rounded-lg px-6 py-2 hover:bg-green-700 transition"
                             >
                               Mark Delivered
                             </button>
@@ -320,7 +373,7 @@ export default function ShipperDashboard() {
                       delivery.status === 'assigned' ? 'bg-blue-400' : 'bg-yellow-400'
                     }`}></div>
                     <span className="text-gray-600">
-                      {delivery.pickupLocation} → {delivery.dropoffLocation}
+                      {delivery.pickup_location} → {delivery.dropoff_location}
                     </span>
                   </div>
                 ))}

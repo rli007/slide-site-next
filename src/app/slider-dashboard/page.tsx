@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
+import { getUserByEmail, getUserRoutes, createRoute, updateRoute, deleteRoute } from "../../lib/database";
 
 interface Route {
   id: string;
-  startLocation: string;
-  endLocation: string;
+  start_location: string;
+  end_location: string;
   schedule: string;
   active: boolean;
 }
@@ -14,96 +16,151 @@ interface Route {
 export default function SliderDashboard() {
   const [userEmail, setUserEmail] = useState('');
   const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [showAddRoute, setShowAddRoute] = useState(false);
   const [newRoute, setNewRoute] = useState({
-    startLocation: '',
-    endLocation: '',
+    start_location: '',
+    end_location: '',
     schedule: ''
   });
-  const LS_KEY = 'slideUser';
 
   useEffect(() => {
     setIsClient(true);
-    // Check authentication and load user data
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (!user) {
-      window.location.href = '/auth';
-      return;
-    }
-    
-    if (user.role !== 'slider') {
-      window.location.href = user.role === 'shipper' ? '/shipper-dashboard' : '/role-select';
-      return;
-    }
-
-    // Display user email and load routes
-    setUserEmail(user.email);
-    setRoutes(user.routes || []);
+    checkAuthAndLoadData();
   }, []);
 
-  const logout = () => {
-    localStorage.removeItem(LS_KEY);
+  const checkAuthAndLoadData = async () => {
+    try {
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.log('No authenticated user, redirecting to auth');
+        window.location.href = '/auth';
+        return;
+      }
+
+      // Check if user has a role set
+      try {
+        const userProfile = await getUserByEmail(user.email!);
+        
+        if (!userProfile.role) {
+          console.log('No role set, redirecting to role selection');
+          window.location.href = '/role-select';
+          return;
+        }
+        
+        if (userProfile.role !== 'slider') {
+          console.log('User is not a slider, redirecting to appropriate dashboard');
+          window.location.href = userProfile.role === 'shipper' ? '/shipper-dashboard' : '/role-select';
+          return;
+        }
+
+        // User is authenticated and has slider role, load data
+        setUserEmail(user.email!);
+        await loadRoutes(user.id);
+        setIsLoading(false);
+        
+      } catch (dbError) {
+        console.error('Database error:', dbError);
+        // If user profile doesn't exist, redirect to role selection
+        window.location.href = '/role-select';
+        return;
+      }
+      
+    } catch (error) {
+      console.error('Auth check error:', error);
+      window.location.href = '/auth';
+    }
+  };
+
+  const loadRoutes = async (userId: string) => {
+    try {
+      const userRoutes = await getUserRoutes(userId);
+      setRoutes(userRoutes || []);
+    } catch (error) {
+      console.error('Error loading routes:', error);
+      setRoutes([]);
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     window.location.href = '/';
   };
 
-  const addRoute = () => {
-    if (!newRoute.startLocation.trim() || !newRoute.endLocation.trim() || !newRoute.schedule.trim()) {
+  const addRoute = async () => {
+    if (!newRoute.start_location.trim() || !newRoute.end_location.trim() || !newRoute.schedule.trim()) {
       return;
     }
 
-    const route: Route = {
-      id: Date.now().toString(),
-      startLocation: newRoute.startLocation,
-      endLocation: newRoute.endLocation,
-      schedule: newRoute.schedule,
-      active: true
-    };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const updatedRoutes = [...routes, route];
-    setRoutes(updatedRoutes);
-    
-    // Update localStorage
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (user) {
-      user.routes = updatedRoutes;
-      localStorage.setItem(LS_KEY, JSON.stringify(user));
+      const routeData = {
+        user_id: user.id,
+        start_location: newRoute.start_location,
+        end_location: newRoute.end_location,
+        schedule: newRoute.schedule,
+        active: true
+      };
+
+      await createRoute(routeData);
+      
+      // Reload routes
+      await loadRoutes(user.id);
+      
+      // Reset form
+      setNewRoute({ start_location: '', end_location: '', schedule: '' });
+      setShowAddRoute(false);
+    } catch (error) {
+      console.error('Error adding route:', error);
     }
-
-    // Reset form
-    setNewRoute({ startLocation: '', endLocation: '', schedule: '' });
-    setShowAddRoute(false);
   };
 
-  const toggleRouteStatus = (routeId: string) => {
-    const updatedRoutes = routes.map(route => 
-      route.id === routeId ? { ...route, active: !route.active } : route
+  const toggleRouteStatus = async (routeId: string) => {
+    try {
+      const route = routes.find(r => r.id === routeId);
+      if (!route) return;
+
+      await updateRoute(routeId, { active: !route.active });
+      
+      // Reload routes
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await loadRoutes(user.id);
+      }
+    } catch (error) {
+      console.error('Error updating route:', error);
+    }
+  };
+
+  const deleteRoute = async (routeId: string) => {
+    try {
+      await deleteRoute(routeId);
+      
+      // Reload routes
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await loadRoutes(user.id);
+      }
+    } catch (error) {
+      console.error('Error deleting route:', error);
+    }
+  };
+
+  // Don't render until client-side and data is loaded
+  if (!isClient || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
     );
-    setRoutes(updatedRoutes);
-    
-    // Update localStorage
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (user) {
-      user.routes = updatedRoutes;
-      localStorage.setItem(LS_KEY, JSON.stringify(user));
-    }
-  };
-
-  const deleteRoute = (routeId: string) => {
-    const updatedRoutes = routes.filter(route => route.id !== routeId);
-    setRoutes(updatedRoutes);
-    
-    // Update localStorage
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (user) {
-      user.routes = updatedRoutes;
-      localStorage.setItem(LS_KEY, JSON.stringify(user));
-    }
-  };
-
-  // Don't render until client-side
-  if (!isClient) {
-    return null;
   }
 
   const activeRoutes = routes.filter(route => route.active);
@@ -179,8 +236,8 @@ export default function SliderDashboard() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Start Location</label>
                     <input
                       type="text"
-                      value={newRoute.startLocation}
-                      onChange={(e) => setNewRoute({...newRoute, startLocation: e.target.value})}
+                      value={newRoute.start_location}
+                      onChange={(e) => setNewRoute({...newRoute, start_location: e.target.value})}
                       placeholder="e.g., San Francisco, CA"
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
                     />
@@ -189,8 +246,8 @@ export default function SliderDashboard() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">End Location</label>
                     <input
                       type="text"
-                      value={newRoute.endLocation}
-                      onChange={(e) => setNewRoute({...newRoute, endLocation: e.target.value})}
+                      value={newRoute.end_location}
+                      onChange={(e) => setNewRoute({...newRoute, end_location: e.target.value})}
                       placeholder="e.g., Oakland, CA"
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
                     />
@@ -225,7 +282,7 @@ export default function SliderDashboard() {
                   {activeRoutes.map(route => (
                     <div key={route.id} className="flex items-center justify-between bg-green-50 rounded-lg p-4 border border-green-200">
                       <div className="flex-1">
-                        <div className="font-medium">{route.startLocation} → {route.endLocation}</div>
+                        <div className="font-medium">{route.start_location} → {route.end_location}</div>
                         <div className="text-sm text-gray-600">{route.schedule}</div>
                       </div>
                       <div className="flex space-x-2">
@@ -256,7 +313,7 @@ export default function SliderDashboard() {
                   {inactiveRoutes.map(route => (
                     <div key={route.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
                       <div className="flex-1">
-                        <div className="font-medium">{route.startLocation} → {route.endLocation}</div>
+                        <div className="font-medium">{route.start_location} → {route.end_location}</div>
                         <div className="text-sm text-gray-600">{route.schedule}</div>
                       </div>
                       <div className="flex space-x-2">

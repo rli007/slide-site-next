@@ -96,32 +96,44 @@ export default function Auth() {
         }
 
         if (authData.user) {
+          // Check if email confirmation is required
+          if (authData.user.email_confirmed_at === null) {
+            setError('Please check your email and click the confirmation link before continuing.');
+            setIsLoading(false);
+            return;
+          }
+          
           // Create user profile in our database
           try {
-            // Wait for the session to be established
-            let session = null;
-            let attempts = 0;
+            // Try to get the session immediately
+            const { data: { session } } = await supabase.auth.getSession();
             
-            while (!session && attempts < 10) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-              const { data: { session: currentSession } } = await supabase.auth.getSession();
-              session = currentSession;
-              attempts++;
-              console.log(`Session check attempt ${attempts}:`, session ? 'Found' : 'Not found');
+            if (session) {
+              console.log('Session found immediately, creating user profile...');
+              await createUser(authData.user.email!);
+              window.location.href = '/role-select';
+            } else {
+              // Try to sign in with the same credentials to establish session
+              console.log('No session, trying to sign in...');
+              const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+              });
+              
+              if (signInError) {
+                throw new Error(`Sign in failed: ${signInError.message}`);
+              }
+              
+              if (signInData.session) {
+                console.log('Session established via sign in, creating user profile...');
+                await createUser(authData.user.email!);
+                window.location.href = '/role-select';
+              } else {
+                throw new Error('Session still not established after sign in');
+              }
             }
-            
-            if (!session) {
-              throw new Error('Session not established after signup');
-            }
-            
-            console.log('Session established, creating user profile...');
-            await createUser(authData.user.email!);
-            // Redirect to role selection
-            window.location.href = '/role-select';
           } catch (dbError) {
             console.error('Database error:', dbError);
-            // If profile creation fails, we still have the auth user
-            // Let them try to log in
             setError('Account created but profile setup failed. Please try logging in.');
             setIsLoading(false);
           }
