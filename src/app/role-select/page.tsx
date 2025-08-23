@@ -2,36 +2,50 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
+import { getUserByEmail, updateUserRole } from "../../lib/database";
 
 export default function RoleSelect() {
   const [isClient, setIsClient] = useState(false);
   const [selectedRole, setSelectedRole] = useState<'slider' | 'shipper' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const LS_KEY = 'slideUser';
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setIsClient(true);
-    // Redirect if not logged in
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (!user) {
-      window.location.href = '/auth';
-    }
+    // Check if user is authenticated
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = '/auth';
+        return;
+      }
+    };
+    checkAuth();
   }, []);
 
   const selectRole = async (role: 'slider' | 'shipper') => {
     setSelectedRole(role);
     setIsLoading(true);
+    setError('');
     
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (user) {
-      user.role = role;
-      localStorage.setItem(LS_KEY, JSON.stringify(user));
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('Authentication error. Please log in again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Update user role in database
+      await updateUserRole(user.id, role);
+      
+      // Redirect to appropriate dashboard
       window.location.href = role === 'slider' ? '/slider-dashboard' : '/shipper-dashboard';
-    } else {
-      window.location.href = '/auth';
+    } catch (err) {
+      setError('Failed to set role. Please try again.');
+      setIsLoading(false);
     }
   };
 
@@ -60,6 +74,12 @@ export default function RoleSelect() {
               Tell us how you want to use Slide. You can always change this later in your settings.
             </p>
           </div>
+          
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-center">
+              {error}
+            </div>
+          )}
           
           <div className="grid md:grid-cols-2 gap-8">
             <div className={`bg-white rounded-2xl shadow-lg p-8 text-center border-2 transition-all duration-200 ${
