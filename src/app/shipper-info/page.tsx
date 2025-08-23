@@ -11,7 +11,7 @@ export default function ShipperInfo() {
             <Link href="/slider-info" className="hover:text-indigo-600">For&nbsp;Sliders</Link>
             <Link href="/shipper-info" className="hover:text-indigo-600">For&nbsp;Shippers</Link>
             <Link href="/#features" className="hover:text-indigo-600">Features</Link>
-            <Link href="/#faq" className="hover:text-indigo-600">FAQ</Link>
+            <Link href="/faq" className="hover:text-indigo-600">FAQ</Link>
           </nav>
           <Link href="/auth" className="rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold shadow hover:bg-indigo-700 transition">Log&nbsp;in</Link>
         </div>

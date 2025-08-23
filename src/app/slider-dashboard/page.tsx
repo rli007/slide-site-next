@@ -3,9 +3,24 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
+interface Route {
+  id: string;
+  startLocation: string;
+  endLocation: string;
+  schedule: string;
+  active: boolean;
+}
+
 export default function SliderDashboard() {
   const [userEmail, setUserEmail] = useState('');
   const [isClient, setIsClient] = useState(false);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [showAddRoute, setShowAddRoute] = useState(false);
+  const [newRoute, setNewRoute] = useState({
+    startLocation: '',
+    endLocation: '',
+    schedule: ''
+  });
   const LS_KEY = 'slideUser';
 
   useEffect(() => {
@@ -22,8 +37,9 @@ export default function SliderDashboard() {
       return;
     }
 
-    // Display user email
+    // Display user email and load routes
     setUserEmail(user.email);
+    setRoutes(user.routes || []);
   }, []);
 
   const logout = () => {
@@ -31,10 +47,67 @@ export default function SliderDashboard() {
     window.location.href = '/';
   };
 
+  const addRoute = () => {
+    if (!newRoute.startLocation.trim() || !newRoute.endLocation.trim() || !newRoute.schedule.trim()) {
+      return;
+    }
+
+    const route: Route = {
+      id: Date.now().toString(),
+      startLocation: newRoute.startLocation,
+      endLocation: newRoute.endLocation,
+      schedule: newRoute.schedule,
+      active: true
+    };
+
+    const updatedRoutes = [...routes, route];
+    setRoutes(updatedRoutes);
+    
+    // Update localStorage
+    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if (user) {
+      user.routes = updatedRoutes;
+      localStorage.setItem(LS_KEY, JSON.stringify(user));
+    }
+
+    // Reset form
+    setNewRoute({ startLocation: '', endLocation: '', schedule: '' });
+    setShowAddRoute(false);
+  };
+
+  const toggleRouteStatus = (routeId: string) => {
+    const updatedRoutes = routes.map(route => 
+      route.id === routeId ? { ...route, active: !route.active } : route
+    );
+    setRoutes(updatedRoutes);
+    
+    // Update localStorage
+    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if (user) {
+      user.routes = updatedRoutes;
+      localStorage.setItem(LS_KEY, JSON.stringify(user));
+    }
+  };
+
+  const deleteRoute = (routeId: string) => {
+    const updatedRoutes = routes.filter(route => route.id !== routeId);
+    setRoutes(updatedRoutes);
+    
+    // Update localStorage
+    const user = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if (user) {
+      user.routes = updatedRoutes;
+      localStorage.setItem(LS_KEY, JSON.stringify(user));
+    }
+  };
+
   // Don't render until client-side
   if (!isClient) {
     return null;
   }
+
+  const activeRoutes = routes.filter(route => route.active);
+  const inactiveRoutes = routes.filter(route => !route.active);
 
   return (
     <>
@@ -58,7 +131,7 @@ export default function SliderDashboard() {
 
       {/* === SLIDER DASHBOARD === */}
       <main className="flex-1">
-        <div className="max-w-4xl mx-auto px-6 py-20">
+        <div className="max-w-6xl mx-auto px-6 py-20">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-extrabold">Slider Dashboard</h2>
             <div className="flex items-center space-x-4">
@@ -66,25 +139,160 @@ export default function SliderDashboard() {
             </div>
           </div>
           
-          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-            <h3 className="text-xl font-semibold mb-4">Welcome back, Slider!</h3>
-            <p className="text-gray-600 mb-6">Your dashboard is coming soon. Check back for delivery opportunities and earnings tracking.</p>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="bg-indigo-50 rounded-lg p-6">
-                <h4 className="font-semibold mb-2">Today&apos;s Earnings</h4>
-                <p className="text-2xl font-bold text-indigo-600">$0</p>
-              </div>
-              <div className="bg-indigo-50 rounded-lg p-6">
-                <h4 className="font-semibold mb-2">Available Routes</h4>
-                <p className="text-2xl font-bold text-indigo-600">0</p>
-              </div>
-              <div className="bg-indigo-50 rounded-lg p-6">
-                <h4 className="font-semibold mb-2">Completed Deliveries</h4>
-                <p className="text-2xl font-bold text-indigo-600">0</p>
-              </div>
+          {/* Stats Overview */}
+          <div className="grid md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h4 className="font-semibold mb-2 text-gray-600">Active Routes</h4>
+              <p className="text-3xl font-bold text-indigo-600">{activeRoutes.length}</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h4 className="font-semibold mb-2 text-gray-600">Total Routes</h4>
+              <p className="text-3xl font-bold text-indigo-600">{routes.length}</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h4 className="font-semibold mb-2 text-gray-600">Today&apos;s Earnings</h4>
+              <p className="text-3xl font-bold text-indigo-600">$0</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h4 className="font-semibold mb-2 text-gray-600">Completed Deliveries</h4>
+              <p className="text-3xl font-bold text-indigo-600">0</p>
             </div>
           </div>
 
+          {/* Route Management */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold">Route Management</h3>
+              <button 
+                onClick={() => setShowAddRoute(!showAddRoute)}
+                className="bg-indigo-600 text-white font-semibold rounded-lg px-4 py-2 hover:bg-indigo-700 transition"
+              >
+                {showAddRoute ? 'Cancel' : 'Add Route'}
+              </button>
+            </div>
+
+            {/* Add Route Form */}
+            {showAddRoute && (
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Location</label>
+                    <input
+                      type="text"
+                      value={newRoute.startLocation}
+                      onChange={(e) => setNewRoute({...newRoute, startLocation: e.target.value})}
+                      placeholder="e.g., San Francisco, CA"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">End Location</label>
+                    <input
+                      type="text"
+                      value={newRoute.endLocation}
+                      onChange={(e) => setNewRoute({...newRoute, endLocation: e.target.value})}
+                      placeholder="e.g., Oakland, CA"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Schedule</label>
+                    <input
+                      type="text"
+                      value={newRoute.schedule}
+                      onChange={(e) => setNewRoute({...newRoute, schedule: e.target.value})}
+                      placeholder="e.g., Weekdays 9AM-5PM"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <button 
+                    onClick={addRoute}
+                    className="bg-green-600 text-white font-semibold rounded-lg px-6 py-2 hover:bg-green-700 transition"
+                  >
+                    Add Route
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Active Routes */}
+            {activeRoutes.length > 0 && (
+              <div className="mb-6">
+                <h4 className="font-semibold mb-4 text-green-700">Active Routes</h4>
+                <div className="space-y-3">
+                  {activeRoutes.map(route => (
+                    <div key={route.id} className="flex items-center justify-between bg-green-50 rounded-lg p-4 border border-green-200">
+                      <div className="flex-1">
+                        <div className="font-medium">{route.startLocation} → {route.endLocation}</div>
+                        <div className="text-sm text-gray-600">{route.schedule}</div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => toggleRouteStatus(route.id)}
+                          className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition"
+                        >
+                          Pause
+                        </button>
+                        <button 
+                          onClick={() => deleteRoute(route.id)}
+                          className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Inactive Routes */}
+            {inactiveRoutes.length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-4 text-gray-700">Inactive Routes</h4>
+                <div className="space-y-3">
+                  {inactiveRoutes.map(route => (
+                    <div key={route.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="flex-1">
+                        <div className="font-medium">{route.startLocation} → {route.endLocation}</div>
+                        <div className="text-sm text-gray-600">{route.schedule}</div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => toggleRouteStatus(route.id)}
+                          className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition"
+                        >
+                          Activate
+                        </button>
+                        <button 
+                          onClick={() => deleteRoute(route.id)}
+                          className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {routes.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m-6 3l6-3" />
+                  </svg>
+                </div>
+                <p className="text-lg font-medium mb-2">No routes yet</p>
+                <p className="text-sm">Add your first route to start receiving delivery opportunities</p>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions */}
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <h3 className="text-xl font-semibold mb-4">Recent Activity</h3>
@@ -99,7 +307,7 @@ export default function SliderDashboard() {
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <h3 className="text-xl font-semibold mb-4">Quick Actions</h3>
               <div className="space-y-3">
-                <button className="w-full bg-indigo-600 text-white font-semibold rounded-lg py-2 hover:bg-indigo-700 transition">Find Routes</button>
+                <button className="w-full bg-indigo-600 text-white font-semibold rounded-lg py-2 hover:bg-indigo-700 transition">Find Deliveries</button>
                 <button className="w-full bg-gray-100 text-gray-700 font-semibold rounded-lg py-2 hover:bg-gray-200 transition">View Earnings</button>
                 <button className="w-full bg-gray-100 text-gray-700 font-semibold rounded-lg py-2 hover:bg-gray-200 transition">Update Profile</button>
               </div>
