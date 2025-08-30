@@ -69,11 +69,19 @@ export default function AvailableDeliveries({ sliderId }: Props) {
 
   const handleAcceptDelivery = async (deliveryId: string, routeId: string) => {
     try {
+      console.log('🚀 Accepting delivery:', deliveryId, 'for route:', routeId);
       await acceptDeliveryMatch(deliveryId, routeId);
+      
+      // Add a small delay to ensure database update is committed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Reload available deliveries
+      console.log('🔄 Reloading available deliveries after acceptance');
       await loadAvailableDeliveries();
+      
+      console.log('✅ Delivery accepted and list reloaded');
     } catch (err) {
-      console.error('Failed to accept delivery:', err);
+      console.error('❌ Failed to accept delivery:', err);
     }
   };
 

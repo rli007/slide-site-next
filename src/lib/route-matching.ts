@@ -310,20 +310,40 @@ export const findAvailableDeliveries = async (sliderId: string): Promise<RouteMa
 // Accept a delivery match
 export const acceptDeliveryMatch = async (deliveryId: string, routeId: string): Promise<void> => {
   try {
+    console.log(`🔄 Updating delivery ${deliveryId} to assigned status with route ${routeId}`);
+    
     // Update delivery status and assign route
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('deliveries')
       .update({ 
         status: 'assigned',
         route_id: routeId
       })
-      .eq('id', deliveryId);
+      .eq('id', deliveryId)
+      .select();
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error updating delivery:', error);
+      throw error;
+    }
     
-    console.log(`Delivery ${deliveryId} assigned to route ${routeId}`);
+    console.log(`✅ Delivery ${deliveryId} successfully updated:`, data);
+    
+    // Verify the update by fetching the delivery
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('deliveries')
+      .select('*')
+      .eq('id', deliveryId)
+      .single();
+    
+    if (verifyError) {
+      console.error('❌ Error verifying delivery update:', verifyError);
+    } else {
+      console.log(`🔍 Verification - Delivery ${deliveryId} status:`, verifyData?.status);
+    }
+    
   } catch (error) {
-    console.error('Error accepting delivery match:', error);
+    console.error('❌ Error accepting delivery match:', error);
     throw error;
   }
 };
