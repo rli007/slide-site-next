@@ -164,11 +164,22 @@ export const findMatchingRoutes = async (delivery: Delivery, topN: number = 5): 
 // Find all available deliveries for a slider
 export const findAvailableDeliveries = async (sliderId: string): Promise<RouteMatch[]> => {
   try {
-    // Get slider's routes
+    // First, find the user ID from the email
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', sliderId)
+      .single();
+    
+    if (userError || !userData) {
+      throw new Error('Failed to find user');
+    }
+    
+    // Get slider's routes using the user ID
     const { data: routes, error: routesError } = await supabase
       .from('routes')
       .select('*')
-      .eq('user_id', sliderId)
+      .eq('user_id', userData.id)
       .eq('active', true);
     
     if (routesError || !routes) {
