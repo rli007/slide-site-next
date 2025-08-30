@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
 import { findAvailableDeliveries, acceptDeliveryMatch } from '../lib/route-matching';
 
 interface Route {
@@ -50,7 +49,7 @@ export default function AvailableDeliveries({ sliderId }: Props) {
     loadAvailableDeliveries();
   }, [sliderId]);
 
-  const loadAvailableDeliveries = async () => {
+  const loadAvailableDeliveries = useCallback(async () => {
     try {
       setIsLoading(true);
       const available = await findAvailableDeliveries(sliderId);
@@ -61,7 +60,7 @@ export default function AvailableDeliveries({ sliderId }: Props) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [sliderId]);
 
   const handleAcceptDelivery = async (deliveryId: string, routeId: string) => {
     try {

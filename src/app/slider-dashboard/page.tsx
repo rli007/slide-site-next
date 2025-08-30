@@ -1,9 +1,9 @@
 'use client';
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
-import { getUserByEmail, getUserRoutes, createRoute, updateRoute, deleteRoute } from "../../lib/database";
+import { getUserByEmail, getUserRoutes, createRoute, updateRoute } from "../../lib/database";
 import AvailableDeliveries from "../../components/AvailableDeliveries";
 
 interface Route {
@@ -31,7 +31,7 @@ export default function SliderDashboard() {
     checkAuthAndLoadData();
   }, []);
 
-  const checkAuthAndLoadData = async () => {
+  const checkAuthAndLoadData = useCallback(async () => {
     try {
       // Check if user is authenticated
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -74,7 +74,7 @@ export default function SliderDashboard() {
       console.error('Auth check error:', error);
       window.location.href = '/auth';
     }
-  };
+  }, []);
 
   const loadRoutes = async (userId: string) => {
     try {
@@ -366,7 +366,7 @@ export default function SliderDashboard() {
             
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <h3 className="text-xl font-semibold mb-4">Need Help?</h3>
-              <p className="text-gray-600 mb-4">Having trouble with your routes or deliveries? Submit a help ticket and we'll get back to you within 24 hours.</p>
+              <p className="text-gray-600 mb-4">Having trouble with your routes or deliveries? Submit a help ticket and we&apos;ll get back to you within 24 hours.</p>
               <button 
                 onClick={() => window.open('mailto:support@slide.com?subject=Slider Support Request', '_blank')}
                 className="w-full bg-indigo-600 text-white font-semibold rounded-lg py-3 hover:bg-indigo-700 transition"

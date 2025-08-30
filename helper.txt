@@ -1,0 +1,389 @@
+# -*- coding: utf-8 -*-
+import googlemaps
+import folium
+import polyline
+import random
+import csv
+import math
+from typing import List, Tuple, Dict
+
+# Your Google API key
+gmaps = googlemaps.Client(key="AIzaSyDCQyE5WocX93wcl83ggH3hqOyusnJqEko")
+
+# Predefined colors for visual separation
+colors = ["red", "blue", "green", "purple", "orange", "darkred", "cadetblue", "darkblue", "darkgreen", "darkpurple", "pink", "lightblue", "lightgreen", "gray", "black"]
+
+
+# --- MAP SIZE HELPER -------------------------------------------------------
+def shrink_map(m, width="70%", height="500px"):
+    """
+    Constrain a Folium map to the given box size while preserving interactivity.
+    Call immediately after you instantiate a folium.Map.
+    """
+    # Give the <div> explicit dimensions
+    m.width  = 1000
+    m.height = 1000
+
+    # Override Leaflet's 100 % page‐filling CSS
+    style_fix = f"""
+    <style>
+        html, body {{height: auto !important; width: auto !important; margin: 0;}}
+        .folium-map {{margin: 2rem auto;}}   /* center horizontally */
+    </style>
+    """
+    m.get_root().html.add_child(folium.Element(style_fix))
+    return m
+# ---------------------------------------------------------------------------
+
+def load_recurring_routes_from_csv(filename):
+    routes = []
+    try:
+        with open(filename, 'r', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                if len(row) >= 10:
+                    route_id = row[0]
+                    origin = row[1]
+                    destination = row[2]
+                    days_of_week = row[9]
+                    if days_of_week and days_of_week.strip() and days_of_week != "":
+                        driver_name = row[8] if len(row) > 8 and row[8] else f"Driver {route_id}"
+                        routes.append((driver_name, origin, destination, days_of_week))
+        print(f"Loaded {len(routes)} recurring routes from CSV")
+        return routes
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+        return []
+
+def create_sample_packages():
+    return [
+        #("Package 1", "San Francisco, CA", "Oakland, CA", "Electronics", "High Priority"),
+        #("Package 2", "San Jose, CA", "San Francisco, CA", "Documents", "Standard"),
+        #("Package 3", "Berkeley, CA", "Palo Alto, CA", "Clothing", "Standard"),
+        ("Package 4", "Hayward, CA", "San Mateo, CA", "Books", "Low Priority"),
+    ]
+
+def get_distance_between_locations(gmaps, loc1, loc2):
+    try:
+        result = gmaps.distance_matrix(loc1, loc2, mode="driving")  # type: ignore
+        if result['rows'][0]['elements'][0]['status'] == 'OK':
+            return result['rows'][0]['elements'][0]['distance']['value']
+        return float('inf')
+    except Exception as e:
+        print(f"Error getting distance between {loc1} and {loc2}: {e}")
+        return float('inf')
+
+def find_top_drivers_for_packages(gmaps, routes, packages, top_n=2):
+    assignments = []
+    
+    for package_id, pickup, delivery, package_type, priority in packages:
+        driver_scores = []
+        
+        for driver, origin, destination, days in routes:
+            pickup_to_origin = get_distance_between_locations(gmaps, pickup, origin)
+            destination_to_delivery = get_distance_between_locations(gmaps, destination, delivery)
+            total_detour = pickup_to_origin + destination_to_delivery
+            
+            priority_multiplier = 1.0
+            if priority == "High Priority":
+                priority_multiplier = 0.7
+            elif priority == "Low Priority":
+                priority_multiplier = 1.3
+            
+            score = total_detour * priority_multiplier
+            
+            driver_scores.append({
+                'driver': (driver, origin, destination, days, pickup_to_origin, destination_to_delivery),
+                'score': score
+            })
+        
+        top_drivers = sorted(driver_scores, key=lambda x: x['score'])[:top_n]
+        
+        assignments.append({
+            'package': (package_id, pickup, delivery, package_type, priority),
+            'top_drivers': top_drivers
+        })
+    
+    return assignments
+
+# Load routes
+routes = load_recurring_routes_from_csv("routes - Sheet1.csv")
+
+if not routes:
+    print("No recurring routes found. Using sample data instead.")
+    routes = [
+        ("Alice", "Stanford University", "San Francisco, CA", "Monday, Tuesday, Wednesday, Thursday, Friday"),
+        ("Bob", "San Jose, CA", "Oakland, CA", "Monday, Tuesday, Friday, Wednesday, Thursday, Sunday, Saturday"),
+        ("Cara", "Berkeley, CA", "Palo Alto, CA", "Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday"),
+    ]
+
+# Create packages
+packages = create_sample_packages()
+print(f"Created {len(packages)} sample packages")
+# ---------- NEW helper ------------------------------------------------------
+def extra_detour(origin, stop1, stop2, base_dist):
+    """Distance origin→stop1→stop2 minus the normal origin→stop2 commute."""
+    return get_distance_between_locations(gmaps, origin, stop1) + \
+           get_distance_between_locations(gmaps, stop1, stop2) - base_dist
+
+
+def best_two_driver_pair(gmaps, routes, pickup, delivery, priority):
+    """
+    Return (best_pair_info, best_score).
+    best_pair_info = (D1_tuple, D2_tuple, transfer_latlng)
+    """
+    best_pair, best_score = None, float('inf')
+    print("hi")
+    # Pre-cache baseline commute distances so we don't hammer the API
+    route_base = {}
+    for drv, o, d, *_ in routes:
+        route_base[(o, d)] = get_distance_between_locations(gmaps, o, d)
+
+    for d1 in routes:
+        drv1, o1, dest1, days1 = d1
+        base1 = route_base[(o1, dest1)]
+
+        # Driver-1 detour parts
+        d1_extra = get_distance_between_locations(gmaps, o1, pickup)
+        d1_extra += extra_detour(pickup, dest1, dest1, 0)  # pickup→dest1 minus 0
+
+        # Transfer point is dest1
+        transfer = dest1
+
+        for d2 in routes:
+            if d2 == d1:
+                continue
+            drv2, o2, dest2, days2 = d2
+            base2 = route_base[(o2, dest2)]
+
+            # Driver-2 detour parts
+            d2_extra = extra_detour(o2, transfer, dest2, base2)  # origin2 via transfer
+            d2_extra += get_distance_between_locations(gmaps, transfer, delivery)
+            d2_extra += extra_detour(delivery, dest2, dest2, 0)  # delivery→dest2 minus 0
+
+            total_extra = d1_extra + d2_extra
+
+            # Priority weighting
+            mult = 0.7 if priority == "High Priority" else 1.3 if priority == "Low Priority" else 1.0
+            score = total_extra * mult
+
+            if score < best_score:
+                best_score = score
+                best_pair = (d1, d2, transfer)
+
+    return best_pair, best_score
+# ---------------------------------------------------------------------------
+
+# ---------- Find best solo + best hand-off for every package ---------------
+assignments = []  # reset
+for pkg in packages:
+    package_id, pickup, delivery, ptype, priority = pkg
+
+    # ---- Best SOLO driver (reuse existing scoring) ------------------------
+    solo_scores = []
+    for drv in routes:
+        driver, origin, dest, days = drv
+        extra = get_distance_between_locations(gmaps, pickup, origin) + \
+                get_distance_between_locations(gmaps, dest, delivery)
+        mult = 0.7 if priority == "High Priority" else 1.3 if priority == "Low Priority" else 1.0
+        score = extra * mult
+        solo_scores.append((score, drv, extra))
+    best_solo_score, best_solo_drv, solo_extra = min(solo_scores, key=lambda x: x[0])
+
+    # ---- Best 2-driver hand-off ------------------------------------------
+    #best_pair, best_pair_score = best_two_driver_pair(gmaps, routes, pickup, delivery, priority)
+
+    # ------------- NO 2-DRIVER SECTION ANY MORE -------------------
+    assignments.append({
+        "package": pkg,
+        "solo": (best_solo_drv, best_solo_score, solo_extra)
+    })
+# ---------------------------------------------------------------------------
+
+# ---------- MAP GENERATION -------------------------------------------------
+def save_solo_map(pkg_info, solo_info):
+    package_id, pickup, delivery, _, _ = pkg_info
+    (drv, origin, dest, days), score, _ = solo_info
+    map_mode = "solo"
+
+    centre = gmaps.geocode(origin)[0]['geometry']['location']
+    m = folium.Map(location=[centre["lat"], centre["lng"]-0.1], zoom_control=False, height=1000, width=800,zoom_start=10.5)
+
+    # commute
+    dir_commute = gmaps.directions(origin, dest, mode="driving")[0]
+    coords = polyline.decode(dir_commute["overview_polyline"]["points"])
+    folium.PolyLine(coords, color="cadetblue", weight=4, opacity=0.5,
+                    tooltip=f"{drv} commute").add_to(m)
+
+    # detour
+    dir_detour = gmaps.directions(origin, dest, mode="driving",
+                                  waypoints=[pickup, delivery])[0]
+    dcoords = polyline.decode(dir_detour["overview_polyline"]["points"])
+    folium.PolyLine(dcoords, color="black", weight=5, opacity=0.8,
+                    dash_array="10,5",
+                    tooltip=f"Detour route for {drv}").add_to(m)
+
+    # markers
+    for label, loc, col in [("Origin", origin, 'green'),
+                            ("Pickup", pickup, 'blue'),
+                            ("Delivery", delivery, 'orange'),
+                            ("Destination", dest, 'red')]:
+        g = gmaps.geocode(loc)[0]['geometry']['location']
+        folium.Marker([g['lat'], g['lng']],
+                      icon=folium.Icon(color=col),
+                      popup=f"{label}: {loc}").add_to(m)
+
+    name = f"package_{package_id.replace(' ', '_')}_solo.html"
+    m.save(name);  print("Saved", name)
+    
+
+
+def save_handoff_map(pkg_info, handoff_info):
+    (d1, d2, transfer), score = handoff_info
+    if not d1 or not d2:
+        return  # no feasible pair
+    package_id, pickup, delivery, _, _ = pkg_info
+    drv1, o1, dest1, days1 = d1
+    drv2, o2, dest2, days2 = d2
+
+    centre = gmaps.geocode(pickup)[0]['geometry']['location']
+    m = folium.Map(location=[centre["lat"], centre["lng"]], zoom_start=10)
+
+    # Driver-1 commute + detour
+    coords1 = polyline.decode(gmaps.directions(o1, dest1)[0]["overview_polyline"]["points"])
+    folium.PolyLine(coords1, color="cadetblue", weight=3, opacity=0.4,
+                    tooltip=f"{drv1} commute").add_to(m)
+    det1 = polyline.decode(gmaps.directions(o1, dest1,
+                                            waypoints=[pickup])[0]["overview_polyline"]["points"])
+    folium.PolyLine(det1, color="black", weight=5, dash_array="10,5",
+                    tooltip=f"{drv1} detour (pickup → transfer)").add_to(m)
+
+    # Driver-2 commute + detour
+    coords2 = polyline.decode(gmaps.directions(o2, dest2)[0]["overview_polyline"]["points"])
+    folium.PolyLine(coords2, color="purple", weight=3, opacity=0.4,
+                    tooltip=f"{drv2} commute").add_to(m)
+    det2 = polyline.decode(gmaps.directions(o2, dest2,
+                                            waypoints=[transfer, delivery])[0]["overview_polyline"]["points"])
+    folium.PolyLine(det2, color="orange", weight=5, dash_array="10,5",
+                    tooltip=f"{drv2} detour (transfer → delivery)").add_to(m)
+
+    # markers
+    points = [("Origin-1", o1, 'green'), ("Pickup", pickup, 'blue'),
+              ("Transfer (Dest-1)", dest1, 'red'),
+              ("Origin-2", o2, 'purple'),
+              ("Delivery", delivery, 'orange'),
+              ("Dest-2", dest2, 'darkred')]
+    for label, loc, col in points:
+        g = gmaps.geocode(loc)[0]['geometry']['location']
+        folium.Marker([g['lat'], g['lng']],
+                      icon=folium.Icon(color=col), popup=f"{label}: {loc}").add_to(m)
+
+    name = f"package_{package_id.replace(' ', '_')}_handoff.html"
+    m.save(name);  print("Saved", name)
+# ---------------------------------------------------------------------------
+
+# ---------- SAVE maps & print summary --------------------------------------
+for a in assignments:
+
+    origin = a["solo"][0][1]
+    dest = a["solo"][0][2]
+    save_solo_map(pkg, a["solo"])
+
+    #save_handoff_map(pkg, a["handoff"])
+
+    # console summary
+    pid, pu, dl, pt, pr = pkg
+    solo_drv, solo_score, solo_extra = a["solo"]
+    #pair, pair_score = a["handoff"]
+
+    print(f"\n{pid}:")
+    print(f"  SOLO  → {solo_drv[0]} | added {solo_extra/1000:.1f} km | score {solo_score:,.0f}")
+    #if pair:
+    #    d1, d2, _ = pair
+    #    print(f"  2-DR  → {d1[0]} ➜ {d2[0]} | score {pair_score:,.0f}")
+    #else:
+    #    print("  2-DR  → no feasible hand-off found")
+
+
+def build_split_page(map_file: str,
+                     sidebar_html: str,
+                     out_file: str = "package_Package_4_split.html",
+                     sidebar_width: str = "64%"):
+    """
+    Wrap an existing Folium map HTML in a two-column layout.
+
+    - `map_file`      = path to the Folium file you just saved
+    - `sidebar_html`  = any HTML string you want on the left
+    - `sidebar_width` = CSS width for the left column
+    """
+    page = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Route & Info</title>
+  <style>
+      html,body{{height:100%;margin:0;font-family:system-ui,sans-serif}}
+      .wrap   {{display:flex;height:100%}}
+      .side   {{width:{sidebar_width};min-width:260px;
+                box-sizing:border-box;padding:1rem;overflow:auto}}
+      iframe  {{flex:1;border:0}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+     <div class="side">
+        {sidebar_html}
+     </div>
+     <iframe src="{map_file}"></iframe>
+  </div>
+</body>
+</html>"""
+
+    with open(out_file, "w", encoding="utf-8") as f:
+        f.write(page)
+    print("✅  Split page saved ➜", out_file)
+
+
+# ── helper ────────────────────────────────────────────────────────────────
+def minutes_between(gmaps, a, b, default_kmh=45):
+    """
+    Try to get Google’s real drive-time in minutes.
+    Fallback: distance / default_kmh.
+    """
+    try:
+        result = gmaps.distance_matrix(a, b, mode="driving")["rows"][0]["elements"][0]
+        if result["status"] == "OK":
+            return round(result["duration"]["value"] / 60)   # seconds ➜ minutes
+    except Exception:
+        pass
+    # fallback – use distance we already fetched:
+    meters = get_distance_between_locations(gmaps, a, b)
+    return round((meters/1000) / default_kmh * 60)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+# minutes for each hop
+t_origin_pick   = minutes_between(gmaps, origin, pickup)
+t_pick_deliver  = minutes_between(gmaps, pickup, delivery)
+t_deliver_dest  = minutes_between(gmaps, delivery, dest)
+
+# --- SIDEBAR HTML ----------------------------------------------------------
+sidebar = f"""
+<h2 style='margin-top:0'>Package 4</h2>
+…
+
+<h3>Detour Flow (minutes)</h3>
+<div class='mermaid'>
+graph TB
+    A["{origin}<br>(start)"] -->|"{t_origin_pick} min"| B["{pickup}<br>(pickup)"]
+    B -->|"{t_pick_deliver} min"| C["{delivery}<br>(drop)"]
+    C -->|"{t_deliver_dest} min"| D["{dest}<br>(resume)"]
+</div>
+
+<script src='https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js'></script>
+<script>mermaid.initialize({{startOnLoad:true}});</script>
+"""
+# --------------------------------------------------------------------------
+
+
+build_split_page("package_Package_4_solo.html", sidebar)

@@ -1,7 +1,6 @@
 import { supabase } from './supabase'
 import type { Database } from './supabase'
 
-type User = Database['public']['Tables']['users']['Row']
 type Route = Database['public']['Tables']['routes']['Row']
 type Delivery = Database['public']['Tables']['deliveries']['Row']
 
