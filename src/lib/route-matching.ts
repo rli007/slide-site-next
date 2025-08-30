@@ -104,7 +104,9 @@ const getPriorityMultiplier = (priority: string): number => {
 
 // Calculate match score for a route and delivery
 const calculateMatchScore = async (delivery: Delivery, route: Route): Promise<MatchScore> => {
+  console.log(`    📏 Calculating distance from ${delivery.pickup_location} to ${route.start_location}`);
   const pickupToOrigin = await getDistanceBetweenLocations(delivery.pickup_location, route.start_location);
+  console.log(`    📏 Calculating distance from ${route.end_location} to ${delivery.dropoff_location}`);
   const destinationToDelivery = await getDistanceBetweenLocations(route.end_location, delivery.dropoff_location);
   
   const totalDetour = pickupToOrigin + destinationToDelivery;
@@ -115,6 +117,8 @@ const calculateMatchScore = async (delivery: Delivery, route: Route): Promise<Ma
   
   const score = totalDetour * priorityMultiplier;
   
+  console.log(`    📊 Score calculation: ${pickupToOrigin}m + ${destinationToDelivery}m = ${totalDetour}m * ${priorityMultiplier} = ${score}`);
+  
   return {
     route,
     score,
@@ -124,7 +128,7 @@ const calculateMatchScore = async (delivery: Delivery, route: Route): Promise<Ma
   };
 };
 
-// Find matching routes for a delivery
+// Find matching routes for a delivery (all routes)
 export const findMatchingRoutes = async (delivery: Delivery, topN: number = 5): Promise<RouteMatch> => {
   try {
     // Get all active routes
@@ -161,9 +165,48 @@ export const findMatchingRoutes = async (delivery: Delivery, topN: number = 5): 
   }
 };
 
+// Find matching routes for a delivery (specific slider's routes only)
+export const findMatchingRoutesForSlider = async (delivery: Delivery, sliderRoutes: Route[], topN: number = 5): Promise<RouteMatch> => {
+  try {
+    console.log(`🔍 Finding matches for delivery ${delivery.id} (${delivery.pickup_location} → ${delivery.dropoff_location})`);
+    console.log(`📍 Checking against ${sliderRoutes.length} slider routes`);
+    
+    // Calculate scores for the slider's routes only
+    const matchScores: MatchScore[] = [];
+    
+    for (const route of sliderRoutes) {
+      console.log(`  📍 Checking route: ${route.start_location} → ${route.end_location}`);
+      const score = await calculateMatchScore(delivery, route);
+      console.log(`    💯 Score: ${score.score}, Extra distance: ${score.extraDistance}m`);
+      matchScores.push(score);
+    }
+
+    // Sort by score (lower is better) and take top N
+    const sortedMatches = matchScores
+      .sort((a, b) => a.score - b.score)
+      .slice(0, topN);
+
+    console.log(`✅ Found ${sortedMatches.length} matches for delivery ${delivery.id}`);
+    if (sortedMatches.length > 0) {
+      console.log(`🏆 Best match: ${sortedMatches[0].route.start_location} → ${sortedMatches[0].route.end_location} (Score: ${sortedMatches[0].score})`);
+    }
+
+    return {
+      delivery,
+      matches: sortedMatches,
+      bestMatch: sortedMatches[0]
+    };
+  } catch (error) {
+    console.error('❌ Error finding matching routes for slider:', error);
+    throw error;
+  }
+};
+
 // Find all available deliveries for a slider
 export const findAvailableDeliveries = async (sliderId: string): Promise<RouteMatch[]> => {
   try {
+    console.log('🔍 Finding available deliveries for slider:', sliderId);
+    
     // First, find the user ID from the email
     const { data: userData, error: userError } = await supabase
       .from('users')
@@ -172,18 +215,31 @@ export const findAvailableDeliveries = async (sliderId: string): Promise<RouteMa
       .single();
     
     if (userError || !userData) {
+      console.error('❌ Failed to find user:', userError);
       throw new Error('Failed to find user');
     }
     
+    console.log('✅ Found user:', userData.id);
+    
     // Get slider's routes using the user ID
-    const { data: routes, error: routesError } = await supabase
+    const { data: sliderRoutes, error: routesError } = await supabase
       .from('routes')
       .select('*')
       .eq('user_id', userData.id)
       .eq('active', true);
     
-    if (routesError || !routes) {
+    if (routesError || !sliderRoutes) {
+      console.error('❌ Failed to fetch slider routes:', routesError);
       throw new Error('Failed to fetch slider routes');
+    }
+
+    console.log('✅ Found slider routes:', sliderRoutes.length, 'routes');
+    console.log('📍 Routes:', sliderRoutes.map(r => `${r.start_location} → ${r.end_location}`));
+
+    // If no active routes, return empty array
+    if (sliderRoutes.length === 0) {
+      console.log('⚠️ No active routes found, returning empty array');
+      return [];
     }
 
     // Get all pending deliveries
@@ -193,16 +249,27 @@ export const findAvailableDeliveries = async (sliderId: string): Promise<RouteMa
       .eq('status', 'pending');
     
     if (deliveriesError || !deliveries) {
+      console.error('❌ Failed to fetch pending deliveries:', deliveriesError);
       throw new Error('Failed to fetch pending deliveries');
     }
 
-    // Find matches for each delivery
+    console.log('✅ Found pending deliveries:', deliveries.length, 'deliveries');
+    console.log('📦 Deliveries:', deliveries.map(d => `${d.pickup_location} → ${d.dropoff_location}`));
+
+    // Find matches for each delivery using only the slider's routes
     const allMatches: RouteMatch[] = [];
     
     for (const delivery of deliveries) {
-      const match = await findMatchingRoutes(delivery, 3); // Top 3 matches
-      allMatches.push(match);
+      const match = await findMatchingRoutesForSlider(delivery, sliderRoutes, 3);
+      if (match.matches.length > 0) { // Only include deliveries that have matches
+        allMatches.push(match);
+        console.log(`✅ Found ${match.matches.length} matches for delivery ${delivery.id}`);
+      } else {
+        console.log(`❌ No matches found for delivery ${delivery.id}`);
+      }
     }
+
+    console.log('🎯 Total matches found:', allMatches.length);
 
     // Sort by best overall score
     return allMatches.sort((a, b) => {
@@ -211,7 +278,7 @@ export const findAvailableDeliveries = async (sliderId: string): Promise<RouteMa
       return aBest - bBest;
     });
   } catch (error) {
-    console.error('Error finding available deliveries:', error);
+    console.error('❌ Error finding available deliveries:', error);
     throw error;
   }
 };
