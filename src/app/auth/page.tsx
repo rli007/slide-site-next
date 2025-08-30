@@ -28,7 +28,7 @@ export default function Auth() {
           } else {
             window.location.href = '/role-select';
           }
-        } catch (error) {
+        } catch {
           // User doesn't exist in our database yet
           window.location.href = '/role-select';
         }
@@ -160,12 +160,12 @@ export default function Auth() {
             } else {
               window.location.href = '/role-select';
             }
-          } catch (dbError) {
+          } catch {
             // User might not have a profile yet, create one
             try {
               await createUser(authData.user.email!);
               window.location.href = '/role-select';
-            } catch (createError) {
+            } catch {
               setError('User profile not found. Please contact support.');
               setIsLoading(false);
             }

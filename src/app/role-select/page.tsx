@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
-import { getUserByEmail, updateUserRole } from "../../lib/database";
+import { updateUserRole } from "../../lib/database";
 
 export default function RoleSelect() {
   const [isClient, setIsClient] = useState(false);
@@ -43,7 +43,7 @@ export default function RoleSelect() {
       
       // Redirect to appropriate dashboard
       window.location.href = role === 'slider' ? '/slider-dashboard' : '/shipper-dashboard';
-    } catch (err) {
+    } catch {
       setError('Failed to set role. Please try again.');
       setIsLoading(false);
     }

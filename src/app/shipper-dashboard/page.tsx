@@ -1,9 +1,9 @@
 'use client';
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
-import { getUserByEmail, getUserDeliveries, createDelivery, updateDelivery, deleteDelivery } from "../../lib/database";
+import { getUserByEmail, getUserDeliveries, createDelivery, updateDelivery } from "../../lib/database";
 import { findMatchingRoutes } from "../../lib/route-matching";
 
 interface Route {
@@ -23,7 +23,13 @@ interface RouteMatch {
 }
 
 interface DeliveryMatch {
-  delivery: any;
+  delivery: {
+    id: string;
+    pickup_location: string;
+    dropoff_location: string;
+    package_size: string;
+    status: string;
+  };
   matches: RouteMatch[];
   bestMatch?: RouteMatch;
 }
@@ -54,7 +60,7 @@ export default function ShipperDashboard() {
     checkAuthAndLoadData();
   }, []);
 
-  const checkAuthAndLoadData = async () => {
+  const checkAuthAndLoadData = useCallback(async () => {
     try {
       // Check if user is authenticated
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -97,7 +103,7 @@ export default function ShipperDashboard() {
       console.error('Auth check error:', error);
       window.location.href = '/auth';
     }
-  };
+  }, []);
 
   const loadDeliveries = async (userId: string) => {
     try {
@@ -171,11 +177,15 @@ export default function ShipperDashboard() {
       // Create a temporary delivery object for route finding
       const tempDelivery = {
         id: 'temp',
+        shipper_id: 'temp',
         pickup_location: newDelivery.pickupLocation,
         dropoff_location: newDelivery.dropoffLocation,
         package_size: newDelivery.packageSize || 'Standard',
-        status: 'pending'
-      } as any;
+        status: 'pending' as const,
+        route_id: undefined,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
       const matches = await findMatchingRoutes(tempDelivery);
       setRouteSuggestions(matches);
@@ -200,9 +210,10 @@ export default function ShipperDashboard() {
     }
   };
 
-  const deleteDelivery = async (deliveryId: string) => {
+  const handleDeleteDelivery = async (deliveryId: string) => {
     try {
-      await deleteDelivery(deliveryId);
+      const { deleteDelivery: deleteDeliveryFromDB } = await import('../../lib/database');
+      await deleteDeliveryFromDB(deliveryId);
       
       // Reload deliveries
       const { data: { user } } = await supabase.auth.getUser();
@@ -467,7 +478,7 @@ export default function ShipperDashboard() {
                             </button>
                           )}
                           <button 
-                            onClick={() => deleteDelivery(delivery.id)}
+                            onClick={() => handleDeleteDelivery(delivery.id)}
                             className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition"
                           >
                             Delete
@@ -519,7 +530,7 @@ export default function ShipperDashboard() {
             
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <h3 className="text-xl font-semibold mb-4">Need Help?</h3>
-              <p className="text-gray-600 mb-4">Having trouble with your shipments or deliveries? Submit a help ticket and we'll get back to you within 24 hours.</p>
+              <p className="text-gray-600 mb-4">Having trouble with your shipments or deliveries? Submit a help ticket and we&apos;ll get back to you within 24 hours.</p>
               <button 
                 onClick={() => window.open('mailto:support@slide.com?subject=Shipper Support Request', '_blank')}
                 className="w-full bg-indigo-600 text-white font-semibold rounded-lg py-3 hover:bg-indigo-700 transition"
