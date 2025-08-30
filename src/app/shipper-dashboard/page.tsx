@@ -4,6 +4,29 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserByEmail, getUserDeliveries, createDelivery, updateDelivery, deleteDelivery } from "../../lib/database";
+import { findMatchingRoutes } from "../../lib/route-matching";
+
+interface Route {
+  id: string;
+  start_location: string;
+  end_location: string;
+  schedule: string;
+  active: boolean;
+}
+
+interface RouteMatch {
+  route: Route;
+  score: number;
+  extraDistance: number;
+  pickupToOrigin: number;
+  destinationToDelivery: number;
+}
+
+interface DeliveryMatch {
+  delivery: any;
+  matches: RouteMatch[];
+  bestMatch?: RouteMatch;
+}
 
 interface Delivery {
   id: string;
@@ -91,6 +114,9 @@ export default function ShipperDashboard() {
     window.location.href = '/';
   };
 
+  const [routeSuggestions, setRouteSuggestions] = useState<DeliveryMatch | null>(null);
+  const [isFindingRoutes, setIsFindingRoutes] = useState(false);
+
   const addDelivery = async () => {
     if (!newDelivery.pickupLocation.trim() || !newDelivery.dropoffLocation.trim() || !newDelivery.packageSize.trim()) {
       return;
@@ -108,7 +134,21 @@ export default function ShipperDashboard() {
         status: 'pending' as const
       };
 
-      await createDelivery(deliveryData);
+      // Create delivery first
+      const createdDelivery = await createDelivery(deliveryData);
+      
+      // Find matching routes for this delivery
+      if (createdDelivery) {
+        setIsFindingRoutes(true);
+        try {
+          const matches = await findMatchingRoutes(createdDelivery);
+          setRouteSuggestions(matches);
+        } catch (error) {
+          console.error('Error finding route matches:', error);
+        } finally {
+          setIsFindingRoutes(false);
+        }
+      }
       
       // Reload deliveries
       await loadDeliveries(user.id);
@@ -118,6 +158,31 @@ export default function ShipperDashboard() {
       setShowAddDelivery(false);
     } catch (error) {
       console.error('Error adding delivery:', error);
+    }
+  };
+
+  const findRoutesForDelivery = async () => {
+    if (!newDelivery.pickupLocation.trim() || !newDelivery.dropoffLocation.trim()) {
+      return;
+    }
+
+    setIsFindingRoutes(true);
+    try {
+      // Create a temporary delivery object for route finding
+      const tempDelivery = {
+        id: 'temp',
+        pickup_location: newDelivery.pickupLocation,
+        dropoff_location: newDelivery.dropoffLocation,
+        package_size: newDelivery.packageSize || 'Standard',
+        status: 'pending'
+      } as any;
+
+      const matches = await findMatchingRoutes(tempDelivery);
+      setRouteSuggestions(matches);
+    } catch (error) {
+      console.error('Error finding route matches:', error);
+    } finally {
+      setIsFindingRoutes(false);
     }
   };
 
@@ -191,16 +256,15 @@ export default function ShipperDashboard() {
       <header className="bg-white/70 backdrop-blur-md fixed top-0 inset-x-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between p-4">
           <Link href="/" className="text-2xl font-extrabold text-indigo-600">Slide</Link>
-          <nav className="hidden md:flex space-x-8 text-sm font-medium">
-            <Link href="/slider-info" className="hover:text-indigo-600">For&nbsp;Sliders</Link>
-            <Link href="/shipper-info" className="hover:text-indigo-600">For&nbsp;Shippers</Link>
-          </nav>
-          <button 
-            onClick={logout} 
-            className="bg-gray-200 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition"
-          >
-            Logout
-          </button>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-600">{userEmail}</span>
+            <button 
+              onClick={logout} 
+              className="bg-gray-200 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
       <div className="h-16"></div>
@@ -285,12 +349,79 @@ export default function ShipperDashboard() {
                     </select>
                   </div>
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 flex space-x-3">
                   <button 
                     onClick={addDelivery}
                     className="bg-green-600 text-white font-semibold rounded-lg px-6 py-2 hover:bg-green-700 transition"
                   >
                     Create Delivery
+                  </button>
+                  <button 
+                    onClick={findRoutesForDelivery}
+                    disabled={!newDelivery.pickupLocation.trim() || !newDelivery.dropoffLocation.trim()}
+                    className="bg-blue-600 text-white font-semibold rounded-lg px-6 py-2 hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {isFindingRoutes ? 'Finding Routes...' : 'Find Route Matches'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Route Suggestions */}
+            {routeSuggestions && (
+              <div className="bg-blue-50 rounded-lg p-6 mb-6 border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-4">Route Matches Found</h4>
+                <p className="text-blue-700 mb-4">
+                  We found {routeSuggestions.matches.length} route(s) that could handle your delivery:
+                </p>
+                
+                <div className="space-y-3">
+                  {routeSuggestions.matches.map((match, index) => (
+                    <div key={match.route.id} className="bg-white rounded-lg p-4 border border-blue-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium text-white ${
+                            index === 0 ? 'bg-green-500' : 'bg-blue-500'
+                          }`}>
+                            {index + 1}
+                          </span>
+                          <span className="font-medium">
+                            {match.route.start_location} → {match.route.end_location}
+                          </span>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          index === 0 ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {index === 0 ? 'Best Match' : 'Good Match'}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                        <div>
+                          <span className="font-medium">Extra Distance:</span> {Math.round(match.extraDistance / 1000 * 10) / 10}km
+                        </div>
+                        <div>
+                          <span className="font-medium">Schedule:</span> {match.route.schedule}
+                        </div>
+                      </div>
+                      
+                      {index === 0 && (
+                        <div className="mt-3 pt-3 border-t border-blue-100">
+                          <p className="text-sm text-blue-700">
+                            <strong>This is your best option!</strong> A driver on this route would only need to make a small detour to handle your delivery.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-blue-200">
+                  <button 
+                    onClick={() => setRouteSuggestions(null)}
+                    className="text-blue-600 hover:text-blue-700 underline text-sm"
+                  >
+                    Hide suggestions
                   </button>
                 </div>
               </div>
@@ -387,16 +518,21 @@ export default function ShipperDashboard() {
             </div>
             
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h3 className="text-xl font-semibold mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <button 
-                  onClick={() => setShowAddDelivery(true)}
-                  className="w-full bg-indigo-600 text-white font-semibold rounded-lg py-2 hover:bg-indigo-700 transition"
+              <h3 className="text-xl font-semibold mb-4">Need Help?</h3>
+              <p className="text-gray-600 mb-4">Having trouble with your shipments or deliveries? Submit a help ticket and we'll get back to you within 24 hours.</p>
+              <button 
+                onClick={() => window.open('mailto:support@slide.com?subject=Shipper Support Request', '_blank')}
+                className="w-full bg-indigo-600 text-white font-semibold rounded-lg py-3 hover:bg-indigo-700 transition"
+              >
+                Submit Help Ticket
+              </button>
+              <div className="mt-3 text-center">
+                <a 
+                  href="mailto:support@slide.com" 
+                  className="text-sm text-indigo-600 hover:text-indigo-700"
                 >
-                  Create Shipment
-                </button>
-                <button className="w-full bg-gray-100 text-gray-700 font-semibold rounded-lg py-2 hover:bg-gray-200 transition">Track Packages</button>
-                <button className="w-full bg-gray-100 text-gray-700 font-semibold rounded-lg py-2 hover:bg-gray-200 transition">View Analytics</button>
+                  support@slide.com
+                </a>
               </div>
             </div>
           </div>

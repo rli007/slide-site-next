@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserByEmail, getUserRoutes, createRoute, updateRoute, deleteRoute } from "../../lib/database";
+import AvailableDeliveries from "../../components/AvailableDeliveries";
 
 interface Route {
   id: string;
@@ -172,16 +173,15 @@ export default function SliderDashboard() {
       <header className="bg-white/70 backdrop-blur-md fixed top-0 inset-x-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between p-4">
           <Link href="/" className="text-2xl font-extrabold text-indigo-600">Slide</Link>
-          <nav className="hidden md:flex space-x-8 text-sm font-medium">
-            <Link href="/slider-info" className="hover:text-indigo-600">For&nbsp;Sliders</Link>
-            <Link href="/shipper-info" className="hover:text-indigo-600">For&nbsp;Shippers</Link>
-          </nav>
-          <button 
-            onClick={logout} 
-            className="bg-gray-200 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition"
-          >
-            Logout
-          </button>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-600">{userEmail}</span>
+            <button 
+              onClick={logout} 
+              className="bg-gray-200 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
       <div className="h-16"></div>
@@ -349,6 +349,9 @@ export default function SliderDashboard() {
             )}
           </div>
 
+          {/* Available Deliveries */}
+          <AvailableDeliveries sliderId={userEmail} />
+
           {/* Quick Actions */}
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-white rounded-2xl shadow-lg p-8">
@@ -362,11 +365,21 @@ export default function SliderDashboard() {
             </div>
             
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h3 className="text-xl font-semibold mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <button className="w-full bg-indigo-600 text-white font-semibold rounded-lg py-2 hover:bg-indigo-700 transition">Find Deliveries</button>
-                <button className="w-full bg-gray-100 text-gray-700 font-semibold rounded-lg py-2 hover:bg-gray-200 transition">View Earnings</button>
-                <button className="w-full bg-gray-100 text-gray-700 font-semibold rounded-lg py-2 hover:bg-gray-200 transition">Update Profile</button>
+              <h3 className="text-xl font-semibold mb-4">Need Help?</h3>
+              <p className="text-gray-600 mb-4">Having trouble with your routes or deliveries? Submit a help ticket and we'll get back to you within 24 hours.</p>
+              <button 
+                onClick={() => window.open('mailto:support@slide.com?subject=Slider Support Request', '_blank')}
+                className="w-full bg-indigo-600 text-white font-semibold rounded-lg py-3 hover:bg-indigo-700 transition"
+              >
+                Submit Help Ticket
+              </button>
+              <div className="mt-3 text-center">
+                <a 
+                  href="mailto:support@slide.com" 
+                  className="text-sm text-indigo-600 hover:text-indigo-700"
+                >
+                  support@slide.com
+                </a>
               </div>
             </div>
           </div>

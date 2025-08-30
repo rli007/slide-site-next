@@ -1,0 +1,224 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { findAvailableDeliveries, acceptDeliveryMatch } from '../lib/route-matching';
+
+interface Route {
+  id: string;
+  start_location: string;
+  end_location: string;
+  schedule: string;
+  active: boolean;
+}
+
+interface AvailableDelivery {
+  delivery: {
+    id: string;
+    pickup_location: string;
+    dropoff_location: string;
+    package_size: string;
+    status: string;
+    created_at: string;
+  };
+  matches: Array<{
+    route: Route;
+    score: number;
+    extraDistance: number;
+    pickupToOrigin: number;
+    destinationToDelivery: number;
+  }>;
+  bestMatch?: {
+    route: Route;
+    score: number;
+    extraDistance: number;
+    pickupToOrigin: number;
+    destinationToDelivery: number;
+  };
+}
+
+interface Props {
+  sliderId: string;
+}
+
+export default function AvailableDeliveries({ sliderId }: Props) {
+  const [deliveries, setDeliveries] = useState<AvailableDelivery[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadAvailableDeliveries();
+  }, [sliderId]);
+
+  const loadAvailableDeliveries = async () => {
+    try {
+      setIsLoading(true);
+      const available = await findAvailableDeliveries(sliderId);
+      setDeliveries(available);
+    } catch (err) {
+      setError('Failed to load available deliveries');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAcceptDelivery = async (deliveryId: string, routeId: string) => {
+    try {
+      await acceptDeliveryMatch(deliveryId, routeId);
+      // Reload available deliveries
+      await loadAvailableDeliveries();
+    } catch (err) {
+      console.error('Failed to accept delivery:', err);
+    }
+  };
+
+  const formatDistance = (meters: number): string => {
+    if (meters < 1000) {
+      return `${Math.round(meters)}m`;
+    }
+    return `${(meters / 1000).toFixed(1)}km`;
+  };
+
+  const formatScore = (score: number): string => {
+    // Lower score is better (less detour)
+    if (score < 5000) return 'Excellent';
+    if (score < 15000) return 'Good';
+    if (score < 30000) return 'Fair';
+    return 'Poor';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg p-8">
+        <h3 className="text-xl font-semibold mb-4">Available Deliveries</h3>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Finding delivery opportunities...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg p-8">
+        <h3 className="text-xl font-semibold mb-4">Available Deliveries</h3>
+        <div className="text-center py-8 text-red-600">
+          <p>{error}</p>
+          <button 
+            onClick={loadAvailableDeliveries}
+            className="mt-2 text-indigo-600 hover:text-indigo-700 underline"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (deliveries.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg p-8">
+        <h3 className="text-xl font-semibold mb-4">Available Deliveries</h3>
+        <div className="text-center py-8 text-gray-500">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+          <p className="text-lg font-medium mb-2">No deliveries available</p>
+          <p className="text-sm">Check back later for new delivery opportunities</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg p-8">
+      <h3 className="text-xl font-semibold mb-4">Available Deliveries</h3>
+      <p className="text-gray-600 mb-6">
+        These deliveries match your routes. Accept the ones that work best for you.
+      </p>
+      
+      <div className="space-y-4">
+        {deliveries.map((item) => (
+          <div key={item.delivery.id} className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <div className="font-medium text-lg">
+                  {item.delivery.pickup_location} → {item.delivery.dropoff_location}
+                </div>
+                <div className="text-sm text-gray-600 mb-2">
+                  Package: {item.delivery.package_size} • Created: {new Date(item.delivery.created_at).toLocaleDateString()}
+                </div>
+                
+                {item.bestMatch && (
+                  <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-green-800">Best Route Match</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        formatScore(item.bestMatch.score) === 'Excellent' ? 'bg-green-100 text-green-800' :
+                        formatScore(item.bestMatch.score) === 'Good' ? 'bg-blue-100 text-blue-800' :
+                        formatScore(item.bestMatch.score) === 'Fair' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {formatScore(item.bestMatch.score)} Match
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-xs text-green-700">
+                      <div>
+                        <span className="font-medium">Extra Distance:</span> {formatDistance(item.bestMatch.extraDistance)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Route:</span> {item.bestMatch.route.start_location} → {item.bestMatch.route.end_location}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="ml-4">
+                <button
+                  onClick={() => item.bestMatch && handleAcceptDelivery(item.delivery.id, item.bestMatch.route.id)}
+                  disabled={!item.bestMatch}
+                  className={`px-4 py-2 rounded-lg font-medium transition ${
+                    item.bestMatch 
+                      ? 'bg-green-600 text-white hover:bg-green-700' 
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  {item.bestMatch ? 'Accept Delivery' : 'No Route Match'}
+                </button>
+              </div>
+            </div>
+            
+            {/* Show all route matches */}
+            {item.matches.length > 1 && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="text-sm font-medium text-gray-700 mb-2">All Route Matches:</div>
+                <div className="space-y-2">
+                  {item.matches.map((match, index) => (
+                    <div key={match.route.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-3">
+                        <span className={`w-2 h-2 rounded-full ${
+                          index === 0 ? 'bg-green-500' : 'bg-gray-300'
+                        }`}></span>
+                        <span className="text-gray-600">
+                          {match.route.start_location} → {match.route.end_location}
+                        </span>
+                      </div>
+                      <div className="text-gray-500">
+                        +{formatDistance(match.extraDistance)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
