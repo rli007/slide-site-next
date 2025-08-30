@@ -28,11 +28,6 @@ export default function SliderDashboard() {
     schedule: ''
   });
 
-  useEffect(() => {
-    setIsClient(true);
-    checkAuthAndLoadData();
-  }, []);
-
   const checkAuthAndLoadData = useCallback(async () => {
     try {
       // Check if user is authenticated
@@ -77,6 +72,11 @@ export default function SliderDashboard() {
       window.location.href = '/auth';
     }
   }, []);
+
+  useEffect(() => {
+    setIsClient(true);
+    checkAuthAndLoadData();
+  }, [checkAuthAndLoadData]);
 
   const loadRoutes = async (userId: string) => {
     try {

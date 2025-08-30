@@ -48,10 +48,6 @@ export default function AvailableDeliveries({ sliderId }: Props) {
 
   console.log('🚀 AvailableDeliveries component mounted with sliderId:', sliderId);
 
-  useEffect(() => {
-    loadAvailableDeliveries();
-  }, [sliderId]);
-
   const loadAvailableDeliveries = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -66,6 +62,10 @@ export default function AvailableDeliveries({ sliderId }: Props) {
       setIsLoading(false);
     }
   }, [sliderId]);
+
+  useEffect(() => {
+    loadAvailableDeliveries();
+  }, [sliderId, loadAvailableDeliveries]);
 
   const handleAcceptDelivery = async (deliveryId: string, routeId: string) => {
     try {

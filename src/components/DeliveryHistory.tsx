@@ -12,7 +12,10 @@ interface Delivery {
   created_at: string;
   updated_at: string;
   route_id?: string;
+  routes?: Route;
 }
+
+
 
 interface Route {
   id: string;
@@ -52,7 +55,7 @@ export default function DeliveryHistory({ shipperId, sliderId }: Props) {
       // Filter by user type
       if (shipperId) {
         // For shippers, get their delivered deliveries
-        const { data: userData, error: userError } = await supabase
+        const { data: userData } = await supabase
           .from('users')
           .select('id')
           .eq('email', shipperId)
@@ -63,14 +66,14 @@ export default function DeliveryHistory({ shipperId, sliderId }: Props) {
         }
       } else if (sliderId) {
         // For sliders, get deliveries assigned to their routes
-        const { data: userData, error: userError } = await supabase
+        const { data: userData } = await supabase
           .from('users')
           .select('id')
           .eq('email', sliderId)
           .single();
         
         if (userData) {
-          const { data: routes, error: routesError } = await supabase
+          const { data: routes } = await supabase
             .from('routes')
             .select('id')
             .eq('user_id', userData.id);
