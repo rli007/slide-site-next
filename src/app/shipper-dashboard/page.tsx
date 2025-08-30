@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
-import { getUserByEmail, getUserDeliveries, createDelivery, updateDelivery } from "../../lib/database";
+import { getUserByEmail, getUserDeliveries, createDelivery } from "../../lib/database";
 import { findMatchingRoutes } from "../../lib/route-matching";
 
 interface Route {
@@ -196,19 +196,7 @@ export default function ShipperDashboard() {
     }
   };
 
-  const updateDeliveryStatus = async (deliveryId: string, newStatus: Delivery['status']) => {
-    try {
-      await updateDelivery(deliveryId, { status: newStatus });
-      
-      // Reload deliveries
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await loadDeliveries(user.id);
-      }
-    } catch (error) {
-      console.error('Error updating delivery:', error);
-    }
-  };
+
 
   const handleDeleteDelivery = async (deliveryId: string) => {
     try {
@@ -452,38 +440,12 @@ export default function ShipperDashboard() {
                         <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(delivery.status)}`}>
                           {getStatusText(delivery.status)}
                         </span>
-                        <div className="flex space-x-2">
-                          {delivery.status === 'pending' && (
-                            <button 
-                              onClick={() => updateDeliveryStatus(delivery.id, 'assigned')}
-                              className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition"
-                            >
-                              Assign
-                            </button>
-                          )}
-                          {delivery.status === 'assigned' && (
-                            <button 
-                              onClick={() => updateDeliveryStatus(delivery.id, 'in-transit')}
-                              className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 transition"
-                            >
-                              Start Transit
-                            </button>
-                          )}
-                          {delivery.status === 'in-transit' && (
-                            <button 
-                              onClick={() => updateDeliveryStatus(delivery.id, 'delivered')}
-                              className="bg-green-500 text-white font-semibold rounded-lg px-6 py-2 hover:bg-green-700 transition"
-                            >
-                              Mark Delivered
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => handleDeleteDelivery(delivery.id)}
-                            className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <button 
+                          onClick={() => handleDeleteDelivery(delivery.id)}
+                          className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   </div>

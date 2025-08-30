@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { findAvailableDeliveries, acceptDeliveryMatch } from '../lib/route-matching';
+import { updateDelivery } from '../lib/database';
 
 interface Route {
   id: string;
@@ -45,6 +46,8 @@ export default function AvailableDeliveries({ sliderId }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  console.log('🚀 AvailableDeliveries component mounted with sliderId:', sliderId);
+
   useEffect(() => {
     loadAvailableDeliveries();
   }, [sliderId]);
@@ -52,11 +55,13 @@ export default function AvailableDeliveries({ sliderId }: Props) {
   const loadAvailableDeliveries = useCallback(async () => {
     try {
       setIsLoading(true);
+      console.log('🔄 Loading available deliveries for slider:', sliderId);
       const available = await findAvailableDeliveries(sliderId);
+      console.log('📦 Available deliveries loaded:', available);
       setDeliveries(available);
     } catch (err) {
+      console.error('❌ Error loading available deliveries:', err);
       setError('Failed to load available deliveries');
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +74,16 @@ export default function AvailableDeliveries({ sliderId }: Props) {
       await loadAvailableDeliveries();
     } catch (err) {
       console.error('Failed to accept delivery:', err);
+    }
+  };
+
+  const handleUpdateStatus = async (deliveryId: string, newStatus: 'assigned' | 'in-transit' | 'delivered') => {
+    try {
+      await updateDelivery(deliveryId, { status: newStatus });
+      // Reload available deliveries
+      await loadAvailableDeliveries();
+    } catch (err) {
+      console.error('Failed to update delivery status:', err);
     }
   };
 
@@ -151,6 +166,20 @@ export default function AvailableDeliveries({ sliderId }: Props) {
                 <div className="text-sm text-gray-600 mb-2">
                   Package: {item.delivery.package_size} • Created: {new Date(item.delivery.created_at).toLocaleDateString()}
                 </div>
+                <div className="flex items-center space-x-3 mb-3">
+                  <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                    item.delivery.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                    item.delivery.status === 'assigned' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                    item.delivery.status === 'in-transit' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                    item.delivery.status === 'delivered' ? 'bg-green-100 text-green-800 border-green-200' :
+                    'bg-gray-100 text-gray-800 border-gray-200'
+                  }`}>
+                    {item.delivery.status === 'pending' ? 'Pending' :
+                     item.delivery.status === 'assigned' ? 'Assigned to Driver' :
+                     item.delivery.status === 'in-transit' ? 'In Transit' :
+                     item.delivery.status === 'delivered' ? 'Delivered' : 'Unknown'}
+                  </span>
+                </div>
                 
                 {item.bestMatch && (
                   <div className="bg-green-50 rounded-lg p-3 border border-green-200">
@@ -177,7 +206,7 @@ export default function AvailableDeliveries({ sliderId }: Props) {
                 )}
               </div>
               
-              <div className="ml-4">
+              <div className="ml-4 flex flex-col space-y-2">
                 <button
                   onClick={() => item.bestMatch && handleAcceptDelivery(item.delivery.id, item.bestMatch.route.id)}
                   disabled={!item.bestMatch}
@@ -189,6 +218,24 @@ export default function AvailableDeliveries({ sliderId }: Props) {
                 >
                   {item.bestMatch ? 'Accept Delivery' : 'No Route Match'}
                 </button>
+                
+                {/* Status Update Buttons - only show if delivery is assigned to this slider */}
+                {item.delivery.status === 'assigned' && (
+                  <button
+                    onClick={() => handleUpdateStatus(item.delivery.id, 'in-transit')}
+                    className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 transition"
+                  >
+                    Start Transit
+                  </button>
+                )}
+                {item.delivery.status === 'in-transit' && (
+                  <button
+                    onClick={() => handleUpdateStatus(item.delivery.id, 'delivered')}
+                    className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition"
+                  >
+                    Mark Delivered
+                  </button>
+                )}
               </div>
             </div>
             
