@@ -264,7 +264,21 @@ export const findAvailableDeliveries = async (sliderId: string): Promise<RouteMa
     if (!allDeliveriesError && allDeliveries) {
       console.log('🔍 All deliveries in database:', allDeliveries.length);
       console.log('📊 Delivery statuses:', allDeliveries.map(d => ({ id: d.id, status: d.status, pickup: d.pickup_location, dropoff: d.dropoff_location })));
+    } else {
+      console.log('❌ Error fetching all deliveries:', allDeliveriesError);
     }
+    
+    // Debug: Check if we can access the deliveries table at all
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('deliveries')
+      .select('count')
+      .limit(1);
+    
+    console.log('🔍 Table access test:', { tableInfo, tableError });
+    
+    // Debug: Check current user context
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    console.log('👤 Current authenticated user:', currentUser?.id, currentUser?.email);
 
     // Find matches for each delivery using only the slider's routes
     const allMatches: RouteMatch[] = [];
