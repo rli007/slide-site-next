@@ -255,6 +255,16 @@ export const findAvailableDeliveries = async (sliderId: string): Promise<RouteMa
 
     console.log('✅ Found pending deliveries:', deliveries.length, 'deliveries');
     console.log('📦 Deliveries:', deliveries.map(d => `${d.pickup_location} → ${d.dropoff_location}`));
+    
+    // Debug: Let's also check what's actually in the deliveries table
+    const { data: allDeliveries, error: allDeliveriesError } = await supabase
+      .from('deliveries')
+      .select('*');
+    
+    if (!allDeliveriesError && allDeliveries) {
+      console.log('🔍 All deliveries in database:', allDeliveries.length);
+      console.log('📊 Delivery statuses:', allDeliveries.map(d => ({ id: d.id, status: d.status, pickup: d.pickup_location, dropoff: d.dropoff_location })));
+    }
 
     // Find matches for each delivery using only the slider's routes
     const allMatches: RouteMatch[] = [];
