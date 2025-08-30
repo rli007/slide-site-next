@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserByEmail, getUserDeliveries, createDelivery } from "../../lib/database";
-import { findMatchingRoutes } from "../../lib/route-matching";
+import DeliveryHistory from "../../components/DeliveryHistory";
 
 interface Route {
   id: string;
@@ -14,25 +14,7 @@ interface Route {
   active: boolean;
 }
 
-interface RouteMatch {
-  route: Route;
-  score: number;
-  extraDistance: number;
-  pickupToOrigin: number;
-  destinationToDelivery: number;
-}
 
-interface DeliveryMatch {
-  delivery: {
-    id: string;
-    pickup_location: string;
-    dropoff_location: string;
-    package_size: string;
-    status: string;
-  };
-  matches: RouteMatch[];
-  bestMatch?: RouteMatch;
-}
 
 interface Delivery {
   id: string;
@@ -120,8 +102,7 @@ export default function ShipperDashboard() {
     window.location.href = '/';
   };
 
-  const [routeSuggestions, setRouteSuggestions] = useState<DeliveryMatch | null>(null);
-  const [isFindingRoutes, setIsFindingRoutes] = useState(false);
+
 
   const addDelivery = async () => {
     if (!newDelivery.pickupLocation.trim() || !newDelivery.dropoffLocation.trim() || !newDelivery.packageSize.trim()) {
@@ -140,21 +121,8 @@ export default function ShipperDashboard() {
         status: 'pending' as const
       };
 
-      // Create delivery first
-      const createdDelivery = await createDelivery(deliveryData);
-      
-      // Find matching routes for this delivery
-      if (createdDelivery) {
-        setIsFindingRoutes(true);
-        try {
-          const matches = await findMatchingRoutes(createdDelivery);
-          setRouteSuggestions(matches);
-        } catch (error) {
-          console.error('Error finding route matches:', error);
-        } finally {
-          setIsFindingRoutes(false);
-        }
-      }
+      // Create delivery
+      await createDelivery(deliveryData);
       
       // Reload deliveries
       await loadDeliveries(user.id);
@@ -167,34 +135,7 @@ export default function ShipperDashboard() {
     }
   };
 
-  const findRoutesForDelivery = async () => {
-    if (!newDelivery.pickupLocation.trim() || !newDelivery.dropoffLocation.trim()) {
-      return;
-    }
 
-    setIsFindingRoutes(true);
-    try {
-      // Create a temporary delivery object for route finding
-      const tempDelivery = {
-        id: 'temp',
-        shipper_id: 'temp',
-        pickup_location: newDelivery.pickupLocation,
-        dropoff_location: newDelivery.dropoffLocation,
-        package_size: newDelivery.packageSize || 'Standard',
-        status: 'pending' as const,
-        route_id: undefined,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      const matches = await findMatchingRoutes(tempDelivery);
-      setRouteSuggestions(matches);
-    } catch (error) {
-      console.error('Error finding route matches:', error);
-    } finally {
-      setIsFindingRoutes(false);
-    }
-  };
 
 
 
@@ -355,76 +296,13 @@ export default function ShipperDashboard() {
                   >
                     Create Delivery
                   </button>
-                  <button 
-                    onClick={findRoutesForDelivery}
-                    disabled={!newDelivery.pickupLocation.trim() || !newDelivery.dropoffLocation.trim()}
-                    className="bg-blue-600 text-white font-semibold rounded-lg px-6 py-2 hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    {isFindingRoutes ? 'Finding Routes...' : 'Find Route Matches'}
-                  </button>
+
                 </div>
               </div>
             )}
 
-            {/* Route Suggestions */}
-            {routeSuggestions && (
-              <div className="bg-blue-50 rounded-lg p-6 mb-6 border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-4">Route Matches Found</h4>
-                <p className="text-blue-700 mb-4">
-                  We found {routeSuggestions.matches.length} route(s) that could handle your delivery:
-                </p>
-                
-                <div className="space-y-3">
-                  {routeSuggestions.matches.map((match, index) => (
-                    <div key={match.route.id} className="bg-white rounded-lg p-4 border border-blue-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-3">
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium text-white ${
-                            index === 0 ? 'bg-green-500' : 'bg-blue-500'
-                          }`}>
-                            {index + 1}
-                          </span>
-                          <span className="font-medium">
-                            {match.route.start_location} → {match.route.end_location}
-                          </span>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          index === 0 ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {index === 0 ? 'Best Match' : 'Good Match'}
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                        <div>
-                          <span className="font-medium">Extra Distance:</span> {Math.round(match.extraDistance / 1000 * 10) / 10}km
-                        </div>
-                        <div>
-                          <span className="font-medium">Schedule:</span> {match.route.schedule}
-                        </div>
-                      </div>
-                      
-                      {index === 0 && (
-                        <div className="mt-3 pt-3 border-t border-blue-100">
-                          <p className="text-sm text-blue-700">
-                            <strong>This is your best option!</strong> A driver on this route would only need to make a small detour to handle your delivery.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="mt-4 pt-4 border-t border-blue-200">
-                  <button 
-                    onClick={() => setRouteSuggestions(null)}
-                    className="text-blue-600 hover:text-blue-700 underline text-sm"
-                  >
-                    Hide suggestions
-                  </button>
-                </div>
-              </div>
-            )}
+
+
 
             {/* Deliveries List */}
             {deliveries.length > 0 ? (
@@ -462,6 +340,12 @@ export default function ShipperDashboard() {
                 <p className="text-sm">Create your first delivery to get started</p>
               </div>
             )}
+          </div>
+
+          {/* Delivery History */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <h3 className="text-xl font-semibold mb-6">Delivery History</h3>
+            <DeliveryHistory shipperId={userEmail} />
           </div>
 
           {/* Quick Actions */}

@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserByEmail, getUserRoutes, createRoute, updateRoute } from "../../lib/database";
 import AvailableDeliveries from "../../components/AvailableDeliveries";
+import ActiveDeliveries from "../../components/ActiveDeliveries";
+import DeliveryHistory from "../../components/DeliveryHistory";
 
 interface Route {
   id: string;
@@ -351,6 +353,18 @@ export default function SliderDashboard() {
 
           {/* Available Deliveries */}
           <AvailableDeliveries sliderId={userEmail} />
+
+          {/* Active Deliveries */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <h3 className="text-xl font-semibold mb-6">Active Deliveries</h3>
+            <ActiveDeliveries sliderId={userEmail} />
+          </div>
+
+          {/* Delivery History */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <h3 className="text-xl font-semibold mb-6">Delivery History</h3>
+            <DeliveryHistory sliderId={userEmail} />
+          </div>
 
           {/* Quick Actions */}
           <div className="grid md:grid-cols-2 gap-8">
