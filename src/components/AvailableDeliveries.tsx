@@ -40,13 +40,14 @@ interface AvailableDelivery {
 interface Props {
   sliderId: string;
   onDeliveryAccepted?: (deliveryId: string) => void;
+  refreshTrigger?: number;
 }
 
-export default function AvailableDeliveries({ sliderId, onDeliveryAccepted }: Props) {
+export default function AvailableDeliveries({ sliderId, onDeliveryAccepted, refreshTrigger }: Props) {
   const [deliveries, setDeliveries] = useState<AvailableDelivery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
 
   console.log('🚀 AvailableDeliveries component mounted with sliderId:', sliderId);
 
@@ -63,11 +64,19 @@ export default function AvailableDeliveries({ sliderId, onDeliveryAccepted }: Pr
     } finally {
       setIsLoading(false);
     }
-  }, [sliderId, refreshTrigger]);
+  }, [sliderId, localRefreshTrigger]);
 
   useEffect(() => {
     loadAvailableDeliveries();
   }, [loadAvailableDeliveries]);
+
+  // Listen for parent refresh trigger
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger !== localRefreshTrigger) {
+      console.log('🔄 Parent triggered refresh, updating local trigger');
+      setLocalRefreshTrigger(refreshTrigger);
+    }
+  }, [refreshTrigger, localRefreshTrigger]);
 
   const handleAcceptDelivery = async (deliveryId: string, routeId: string) => {
     try {
@@ -83,7 +92,7 @@ export default function AvailableDeliveries({ sliderId, onDeliveryAccepted }: Pr
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Trigger a refresh by updating the refresh trigger
-      setRefreshTrigger((prev: number) => prev + 1);
+      setLocalRefreshTrigger((prev: number) => prev + 1);
       
       console.log('✅ Delivery accepted and refresh triggered');
     } catch (err) {

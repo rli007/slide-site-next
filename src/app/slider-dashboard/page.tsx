@@ -96,9 +96,12 @@ export default function SliderDashboard() {
   // Add callback function for delivery state management
   const handleDeliveryAccepted = useCallback((deliveryId: string) => {
     console.log('🎯 Delivery accepted in parent:', deliveryId);
-    // This will trigger a refresh of both available and active deliveries
-    // The child components will handle their own data loading
+    // Force refresh of both components by updating a refresh trigger
+    setRefreshTrigger(prev => prev + 1);
   }, []);
+
+  // Add refresh trigger state
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const addRoute = async () => {
     if (!newRoute.start_location.trim() || !newRoute.end_location.trim() || !newRoute.schedule.trim()) {
@@ -362,12 +365,13 @@ export default function SliderDashboard() {
           <AvailableDeliveries 
             sliderId={userEmail} 
             onDeliveryAccepted={handleDeliveryAccepted}
+            refreshTrigger={refreshTrigger}
           />
 
           {/* Active Deliveries */}
           <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
             <h3 className="text-xl font-semibold mb-6">Active Deliveries</h3>
-            <ActiveDeliveries sliderId={userEmail} />
+            <ActiveDeliveries sliderId={userEmail} refreshTrigger={refreshTrigger} />
           </div>
 
           {/* Delivery History */}

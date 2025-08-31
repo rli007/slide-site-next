@@ -26,12 +26,14 @@ interface ActiveDelivery {
 
 interface Props {
   sliderId: string;
+  refreshTrigger?: number;
 }
 
-export default function ActiveDeliveries({ sliderId }: Props) {
+export default function ActiveDeliveries({ sliderId, refreshTrigger }: Props) {
   const [deliveries, setDeliveries] = useState<ActiveDelivery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
 
   const loadActiveDeliveries = useCallback(async () => {
     try {
@@ -86,11 +88,19 @@ export default function ActiveDeliveries({ sliderId }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }, [sliderId]);
+  }, [sliderId, localRefreshTrigger]);
 
   useEffect(() => {
     loadActiveDeliveries();
   }, [loadActiveDeliveries]);
+
+  // Listen for parent refresh trigger
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger !== localRefreshTrigger) {
+      console.log('🔄 Parent triggered refresh, updating local trigger');
+      setLocalRefreshTrigger(refreshTrigger);
+    }
+  }, [refreshTrigger, localRefreshTrigger]);
 
   const handleUpdateStatus = async (deliveryId: string, newStatus: 'in-transit' | 'delivered') => {
     try {
