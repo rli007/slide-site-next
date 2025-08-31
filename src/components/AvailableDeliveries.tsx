@@ -39,12 +39,14 @@ interface AvailableDelivery {
 
 interface Props {
   sliderId: string;
+  onDeliveryAccepted?: (deliveryId: string) => void;
 }
 
-export default function AvailableDeliveries({ sliderId }: Props) {
+export default function AvailableDeliveries({ sliderId, onDeliveryAccepted }: Props) {
   const [deliveries, setDeliveries] = useState<AvailableDelivery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   console.log('🚀 AvailableDeliveries component mounted with sliderId:', sliderId);
 
@@ -61,25 +63,29 @@ export default function AvailableDeliveries({ sliderId }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }, [sliderId]);
+  }, [sliderId, refreshTrigger]);
 
   useEffect(() => {
     loadAvailableDeliveries();
-  }, [sliderId, loadAvailableDeliveries]);
+  }, [loadAvailableDeliveries]);
 
   const handleAcceptDelivery = async (deliveryId: string, routeId: string) => {
     try {
       console.log('🚀 Accepting delivery:', deliveryId, 'for route:', routeId);
       await acceptDeliveryMatch(deliveryId, routeId);
       
+      // Call the callback to notify parent component
+      if (onDeliveryAccepted) {
+        onDeliveryAccepted(deliveryId);
+      }
+      
       // Add a small delay to ensure database update is committed
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Reload available deliveries
-      console.log('🔄 Reloading available deliveries after acceptance');
-      await loadAvailableDeliveries();
+      // Trigger a refresh by updating the refresh trigger
+      setRefreshTrigger((prev: number) => prev + 1);
       
-      console.log('✅ Delivery accepted and list reloaded');
+      console.log('✅ Delivery accepted and refresh triggered');
     } catch (err) {
       console.error('❌ Failed to accept delivery:', err);
     }
