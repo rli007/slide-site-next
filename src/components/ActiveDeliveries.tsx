@@ -35,29 +35,54 @@ export default function ActiveDeliveries({ sliderId, refreshTrigger }: Props) {
   const [error, setError] = useState('');
   const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
 
+  // Listen for parent refresh trigger
+  useEffect(() => {
+    console.log('🔄 === ACTIVE DELIVERIES REFRESH TRIGGER EFFECT ===');
+    console.log('📊 Parent refresh trigger:', refreshTrigger);
+    console.log('📊 Local refresh trigger:', localRefreshTrigger);
+    
+    if (refreshTrigger && refreshTrigger !== localRefreshTrigger) {
+      console.log('🔄 Parent triggered refresh, updating local trigger');
+      console.log('🔄 Updating local trigger from', localRefreshTrigger, 'to', refreshTrigger);
+      setLocalRefreshTrigger(refreshTrigger);
+    } else {
+      console.log('ℹ️ No refresh needed or triggers are the same');
+    }
+  }, [refreshTrigger, localRefreshTrigger]);
+
   const loadActiveDeliveries = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Loading active deliveries for slider:', sliderId);
+      console.log('🔄 === LOADING ACTIVE DELIVERIES ===');
+      console.log('👤 Slider ID:', sliderId);
+      console.log('🔄 Local refresh trigger:', localRefreshTrigger);
       
       // Get deliveries assigned to this slider's routes
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('❌ No authenticated user found');
+        return;
+      }
+      console.log('✅ Authenticated user:', user.id);
 
       // First get the slider's routes
+      console.log('🛣️ Fetching slider routes...');
       const { data: routes, error: routesError } = await supabase
         .from('routes')
         .select('*')
         .eq('user_id', user.id);
 
       if (routesError || !routes) {
-        console.error('Error fetching routes:', routesError);
+        console.error('❌ Error fetching routes:', routesError);
         return;
       }
+      console.log('✅ Found routes:', routes.length, 'routes');
 
       const routeIds = routes.map(r => r.id);
+      console.log('🆔 Route IDs:', routeIds);
       
       // Get deliveries assigned to these routes
+      console.log('📦 Fetching deliveries for routes...');
       const { data: activeDeliveries, error: deliveriesError } = await supabase
         .from('deliveries')
         .select(`
@@ -75,15 +100,31 @@ export default function ActiveDeliveries({ sliderId, refreshTrigger }: Props) {
         .order('created_at', { ascending: false });
 
       if (deliveriesError) {
-        console.error('Error fetching active deliveries:', deliveriesError);
+        console.error('❌ Error fetching active deliveries:', deliveriesError);
         setError('Failed to load active deliveries');
         return;
       }
 
       console.log('📦 Active deliveries loaded:', activeDeliveries);
+      console.log('📊 Total active deliveries:', activeDeliveries?.length || 0);
+      
+      if (activeDeliveries && activeDeliveries.length > 0) {
+        activeDeliveries.forEach((delivery, index) => {
+          console.log(`📦 Delivery ${index + 1}:`, {
+            id: delivery.id,
+            status: delivery.status,
+            route_id: delivery.route_id,
+            pickup: delivery.pickup_location,
+            dropoff: delivery.dropoff_location
+          });
+        });
+      }
+      
       setDeliveries(activeDeliveries || []);
+      console.log('✅ === ACTIVE DELIVERIES LOADED ===');
     } catch (err) {
-      console.error('Error loading active deliveries:', err);
+      console.error('❌ === ERROR LOADING ACTIVE DELIVERIES ===');
+      console.error('❌ Error details:', err);
       setError('Failed to load active deliveries');
     } finally {
       setIsLoading(false);
@@ -93,14 +134,6 @@ export default function ActiveDeliveries({ sliderId, refreshTrigger }: Props) {
   useEffect(() => {
     loadActiveDeliveries();
   }, [loadActiveDeliveries]);
-
-  // Listen for parent refresh trigger
-  useEffect(() => {
-    if (refreshTrigger && refreshTrigger !== localRefreshTrigger) {
-      console.log('🔄 Parent triggered refresh, updating local trigger');
-      setLocalRefreshTrigger(refreshTrigger);
-    }
-  }, [refreshTrigger, localRefreshTrigger]);
 
   const handleUpdateStatus = async (deliveryId: string, newStatus: 'in-transit' | 'delivered') => {
     try {

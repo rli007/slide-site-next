@@ -93,15 +93,26 @@ export default function SliderDashboard() {
     window.location.href = '/';
   };
 
-  // Add callback function for delivery state management
-  const handleDeliveryAccepted = useCallback((deliveryId: string) => {
-    console.log('🎯 Delivery accepted in parent:', deliveryId);
-    // Force refresh of both components by updating a refresh trigger
-    setRefreshTrigger(prev => prev + 1);
-  }, []);
-
   // Add refresh trigger state
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Add callback function for delivery state management
+  const handleDeliveryAccepted = useCallback((deliveryId: string) => {
+    console.log('🎯 === PARENT CALLBACK START ===');
+    console.log('📦 Delivery ID received:', deliveryId);
+    console.log('👤 Current user email:', userEmail);
+    console.log('🔄 Current refresh trigger value:', refreshTrigger);
+    
+    // Force refresh of both components by updating a refresh trigger
+    console.log('🔄 Updating refresh trigger...');
+    setRefreshTrigger(prev => {
+      const newValue = prev + 1;
+      console.log('🔄 Refresh trigger updated from', prev, 'to', newValue);
+      return newValue;
+    });
+    
+    console.log('✅ === PARENT CALLBACK COMPLETED ===');
+  }, [userEmail, refreshTrigger]);
 
   const addRoute = async () => {
     if (!newRoute.start_location.trim() || !newRoute.end_location.trim() || !newRoute.schedule.trim()) {
