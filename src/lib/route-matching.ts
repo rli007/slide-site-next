@@ -18,30 +18,43 @@ interface RouteMatch {
   bestMatch?: MatchScore;
 }
 
-// Google Maps API integration (you'll need to add your API key)
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+// Google Maps API is now handled by our backend API route
 
-// Calculate distance between two locations using Google Maps API
-const getDistanceBetweenLocations = async (origin: string, destination: string): Promise<number> => {
-  if (!GOOGLE_MAPS_API_KEY) {
-    // Fallback: rough distance calculation (you can improve this)
-    return calculateRoughDistance(origin, destination);
-  }
-
+// Calculate distance between two locations using our backend API
+export const getDistanceBetweenLocations = async (origin: string, destination: string): Promise<number> => {
   try {
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destination)}&key=${GOOGLE_MAPS_API_KEY}&mode=driving`
-    );
+    console.log(`📍 Calculating distance from ${origin} to ${destination}`);
     
+    // Call our backend API instead of Google Maps directly
+    const response = await fetch('/api/distance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        origins: origin,
+        destinations: destination
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
     
-    if (data.rows?.[0]?.elements?.[0]?.status === 'OK') {
-      return data.rows[0].elements[0].distance.value; // meters
+    if (data.error) {
+      throw new Error(data.error);
     }
+
+    console.log(`✅ Distance calculated: ${data.distance}m from ${origin} to ${destination}`);
+    return data.distance;
     
-    return calculateRoughDistance(origin, destination);
   } catch (error) {
-    console.error('Google Maps API error:', error);
+    console.error('❌ Distance calculation error:', error);
+    
+    // Fallback to rough distance calculation
+    console.log('🔄 Falling back to rough distance calculation');
     return calculateRoughDistance(origin, destination);
   }
 };
