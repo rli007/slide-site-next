@@ -49,17 +49,12 @@ export default function AvailableDeliveries({ sliderId, onDeliveryAccepted, refr
   const [error, setError] = useState('');
   const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
 
-  console.log('🚀 AvailableDeliveries component mounted with sliderId:', sliderId);
-
   const loadAvailableDeliveries = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Loading available deliveries for slider:', sliderId);
       const available = await findAvailableDeliveries(sliderId);
-      console.log('📦 Available deliveries loaded:', available);
       setDeliveries(available);
     } catch (err) {
-      console.error('❌ Error loading available deliveries:', err);
       setError('Failed to load available deliveries');
     } finally {
       setIsLoading(false);
@@ -72,58 +67,29 @@ export default function AvailableDeliveries({ sliderId, onDeliveryAccepted, refr
 
   // Listen for parent refresh trigger
   useEffect(() => {
-    console.log('🔄 === AVAILABLE DELIVERIES REFRESH TRIGGER EFFECT ===');
-    console.log('📊 Parent refresh trigger:', refreshTrigger);
-    console.log('📊 Local refresh trigger:', localRefreshTrigger);
     
     if (refreshTrigger && refreshTrigger !== localRefreshTrigger) {
-      console.log('🔄 Parent triggered refresh, updating local trigger');
-      console.log('🔄 Updating local trigger from', localRefreshTrigger, 'to', refreshTrigger);
       setLocalRefreshTrigger(refreshTrigger);
-    } else {
-      console.log('ℹ️ No refresh needed or triggers are the same');
     }
   }, [refreshTrigger, localRefreshTrigger]);
 
   const handleAcceptDelivery = async (deliveryId: string, routeId: string) => {
     try {
-      console.log('🚀 === ACCEPT DELIVERY START ===');
-      console.log('📦 Delivery ID:', deliveryId);
-      console.log('🛣️ Route ID:', routeId);
-      console.log('👤 Current slider ID:', sliderId);
-      
-      console.log('🔄 Calling acceptDeliveryMatch...');
       await acceptDeliveryMatch(deliveryId, routeId);
-      console.log('✅ acceptDeliveryMatch completed successfully');
       
       // Call the callback to notify parent component
       if (onDeliveryAccepted) {
-        console.log('📞 Calling onDeliveryAccepted callback with delivery ID:', deliveryId);
         onDeliveryAccepted(deliveryId);
-        console.log('✅ onDeliveryAccepted callback completed');
-      } else {
-        console.log('⚠️ No onDeliveryAccepted callback provided');
       }
       
       // Add a small delay to ensure database update is committed
-      console.log('⏳ Waiting 100ms for database commit...');
       await new Promise(resolve => setTimeout(resolve, 100));
-      console.log('✅ Wait completed');
       
       // Trigger a refresh by updating the refresh trigger
-      console.log('🔄 Updating local refresh trigger...');
-      setLocalRefreshTrigger((prev: number) => {
-        const newValue = prev + 1;
-        console.log('🔄 Local refresh trigger updated from', prev, 'to', newValue);
-        return newValue;
-      });
+      setLocalRefreshTrigger((prev: number) => prev + 1);
       
-      console.log('✅ === ACCEPT DELIVERY COMPLETED ===');
     } catch (err) {
-      console.error('❌ === ACCEPT DELIVERY FAILED ===');
-      console.error('❌ Error details:', err);
-      console.error('❌ Error message:', err instanceof Error ? err.message : 'Unknown error');
-      console.error('❌ Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      console.error('Failed to accept delivery:', err);
     }
   };
 
