@@ -8,7 +8,7 @@ import math
 from typing import List, Tuple, Dict
 
 # Your Google API key
-gmaps = googlemaps.Client(key="AIzaSyDCQyE5WocX93wcl83ggH3hqOyusnJqEko")
+gmaps = os.environ["GOOGLE_MAPS_API_KEY"]
 
 # Predefined colors for visual separation
 colors = ["red", "blue", "green", "purple", "orange", "darkred", "cadetblue", "darkblue", "darkgreen", "darkpurple", "pink", "lightblue", "lightgreen", "gray", "black"]
